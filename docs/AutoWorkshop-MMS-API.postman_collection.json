@@ -1,0 +1,1743 @@
+{
+	"info": {
+		"_postman_id": "autoworkshop-mms-api-collection",
+		"name": "AutoWorkshop MMS API",
+		"description": "Complete API Collection for AutoWorkshop Management System",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		}
+	],
+	"item": [
+		{
+			"name": "🔐 Auth",
+			"item": [
+				{
+					"name": "Login (Admin)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set('token', jsonData.data.token);",
+									"    console.log('Token saved!');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "login"]
+						},
+						"description": "Login sebagai Admin untuk mendapatkan token JWT"
+					},
+					"response": []
+				},
+				{
+					"name": "Login (Kasir)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set('token', jsonData.data.token);",
+									"    console.log('Token saved!');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"kasir\",\n    \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "login"]
+						},
+						"description": "Login sebagai Kasir untuk mendapatkan token JWT"
+					},
+					"response": []
+				},
+				{
+					"name": "Register User (Admin Only)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"kasir_baru\",\n    \"password\": \"password123\",\n    \"full_name\": \"Kasir Baru\",\n    \"role\": \"CASHIER\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "register"]
+						},
+						"description": "Register user baru (hanya Admin)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current User",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/me",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "me"]
+						},
+						"description": "Mendapatkan info user yang sedang login"
+					},
+					"response": []
+				},
+				{
+					"name": "Change Password",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"old_password\": \"password123\",\n    \"new_password\": \"newpassword456\",\n    \"confirm_password\": \"newpassword456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/change-password",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "change-password"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/logout",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "logout"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📦 Products",
+			"item": [
+				{
+					"name": "Get All Products",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/products?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["products"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "20"},
+								{"key": "search", "value": "", "disabled": true},
+								{"key": "category", "value": "", "disabled": true},
+								{"key": "low_stock", "value": "true", "disabled": true}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Product by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/products/1",
+							"host": ["{{base_url}}"],
+							"path": ["products", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Low Stock Products",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/products/low-stock",
+							"host": ["{{base_url}}"],
+							"path": ["products", "low-stock"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Product (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"sku\": \"OLI-PERTAMINA-PRIMA-4L\",\n    \"name\": \"Oli Pertamina Prima XP 10W-40 (4 Liter)\",\n    \"category\": \"Oli Mesin\",\n    \"image_url\": \"/images/products/pertamina-prima.jpg\",\n    \"price_buy\": 180000,\n    \"price_sell\": 280000,\n    \"stock\": 15,\n    \"min_stock_alert\": 5\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/products",
+							"host": ["{{base_url}}"],
+							"path": ["products"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Product (Admin)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"price_sell\": 300000,\n    \"min_stock_alert\": 8\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/products/1",
+							"host": ["{{base_url}}"],
+							"path": ["products", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Product (Admin)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/products/99",
+							"host": ["{{base_url}}"],
+							"path": ["products", "99"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🛠️ Services",
+			"item": [
+				{
+					"name": "Get All Services",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/services?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["services"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "20"},
+								{"key": "search", "value": "", "disabled": true}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Service by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/services/1",
+							"host": ["{{base_url}}"],
+							"path": ["services", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Service (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Jasa Cuci Mesin\",\n    \"price\": 75000\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/services",
+							"host": ["{{base_url}}"],
+							"path": ["services"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Service (Admin)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Jasa Ganti Oli (Update)\",\n    \"price\": 55000\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/services/1",
+							"host": ["{{base_url}}"],
+							"path": ["services", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Service (Admin)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/services/99",
+							"host": ["{{base_url}}"],
+							"path": ["services", "99"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📦 Packages",
+			"item": [
+				{
+					"name": "Get All Packages",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/packages?page=1&limit=20&active_only=true",
+							"host": ["{{base_url}}"],
+							"path": ["packages"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "20"},
+								{"key": "active_only", "value": "true"},
+								{"key": "search", "value": "", "disabled": true}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Package by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/packages/1",
+							"host": ["{{base_url}}"],
+							"path": ["packages", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Check Package Availability",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/packages/1/check-availability?qty=2",
+							"host": ["{{base_url}}"],
+							"path": ["packages", "1", "check-availability"],
+							"query": [
+								{"key": "qty", "value": "2"}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Package (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Paket Service AC Hemat\",\n    \"price\": 350000,\n    \"description\": \"Paket service AC termasuk cuci evaporator dan isi freon\",\n    \"is_active\": true,\n    \"items\": [\n        {\n            \"product_id\": 8,\n            \"qty\": 2\n        },\n        {\n            \"service_id\": 6,\n            \"qty\": 1\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/packages",
+							"host": ["{{base_url}}"],
+							"path": ["packages"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Package (Admin)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Paket Service AC Premium\",\n    \"price\": 400000,\n    \"items\": [\n        {\n            \"product_id\": 8,\n            \"qty\": 3\n        },\n        {\n            \"service_id\": 6,\n            \"qty\": 1\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/packages/1",
+							"host": ["{{base_url}}"],
+							"path": ["packages", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Package (Admin)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/packages/99",
+							"host": ["{{base_url}}"],
+							"path": ["packages", "99"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "👥 Customers",
+			"item": [
+				{
+					"name": "Get All Customers",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/customers?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["customers"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "20"},
+								{"key": "search", "value": "", "disabled": true}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Customer by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/customers/1",
+							"host": ["{{base_url}}"],
+							"path": ["customers", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Customer",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Pak Bambang Sugiarto\",\n    \"phone\": \"08991234567\",\n    \"address\": \"Jl. Melati No. 25, Bekasi\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/customers",
+							"host": ["{{base_url}}"],
+							"path": ["customers"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Customer",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Pak Bambang S.\",\n    \"address\": \"Jl. Melati Indah No. 25, Bekasi Selatan\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/customers/1",
+							"host": ["{{base_url}}"],
+							"path": ["customers", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Customer",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/customers/99",
+							"host": ["{{base_url}}"],
+							"path": ["customers", "99"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🚗 Vehicles",
+			"item": [
+				{
+					"name": "Get All Vehicles",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/vehicles?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["vehicles"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "20"},
+								{"key": "search", "value": "", "disabled": true},
+								{"key": "customer_id", "value": "", "disabled": true}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Vehicle by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/vehicles/1",
+							"host": ["{{base_url}}"],
+							"path": ["vehicles", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Vehicle",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer_id\": 1,\n    \"license_plate\": \"B 5678 ZZ\",\n    \"brand\": \"Daihatsu\",\n    \"model\": \"Sigra 1.2 R Deluxe MT 2022\",\n    \"current_km\": 12000\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/vehicles",
+							"host": ["{{base_url}}"],
+							"path": ["vehicles"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Vehicle",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"current_km\": 15000\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/vehicles/1",
+							"host": ["{{base_url}}"],
+							"path": ["vehicles", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Vehicle",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/vehicles/99",
+							"host": ["{{base_url}}"],
+							"path": ["vehicles", "99"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "🔔 Get Vehicles Due for Service",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/vehicles/due-service",
+							"host": ["{{base_url}}"],
+							"path": ["vehicles", "due-service"]
+						},
+						"description": "Mendapatkan daftar kendaraan yang perlu service dalam 7 hari ke depan atau sudah overdue"
+					},
+					"response": []
+				},
+				{
+					"name": "🔔 Mark Vehicle as Contacted",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"notes\": \"Pelanggan akan datang besok jam 10 pagi\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/vehicles/1/mark-contacted",
+							"host": ["{{base_url}}"],
+							"path": ["vehicles", "1", "mark-contacted"]
+						},
+						"description": "Tandai kendaraan bahwa pelanggan sudah dihubungi untuk reminder service"
+					},
+					"response": []
+				},
+				{
+					"name": "🔔 Reset Reminder Status",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/vehicles/1/reset-reminder",
+							"host": ["{{base_url}}"],
+							"path": ["vehicles", "1", "reset-reminder"]
+						},
+						"description": "Reset status reminder kendaraan (biasanya otomatis saat transaksi baru)"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🔧 Mechanics",
+			"item": [
+				{
+					"name": "Get All Mechanics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/mechanics?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["mechanics"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "20"},
+								{"key": "is_active", "value": "true", "disabled": true}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Mechanic by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/mechanics/1",
+							"host": ["{{base_url}}"],
+							"path": ["mechanics", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Mechanic",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Dedi Kurniawan\",\n    \"is_active\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/mechanics",
+							"host": ["{{base_url}}"],
+							"path": ["mechanics"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Mechanic",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"is_active\": false\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/mechanics/1",
+							"host": ["{{base_url}}"],
+							"path": ["mechanics", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Mechanic",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/mechanics/99",
+							"host": ["{{base_url}}"],
+							"path": ["mechanics", "99"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "💰 Transactions (POS)",
+			"item": [
+				{
+					"name": "Create Transaction - Lunas",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"vehicle_id\": 1,\n    \"mechanic_id\": 1,\n    \"current_km\": 52000,\n    \"discount_amount\": 10000,\n    \"notes\": \"Service berkala 50.000 KM - Customer setia\",\n    \"items\": [\n        {\n            \"item_type\": \"PACKAGE\",\n            \"item_id\": 1,\n            \"qty\": 1,\n            \"discount_amount\": 0\n        },\n        {\n            \"item_type\": \"SERVICE\",\n            \"item_id\": 4,\n            \"qty\": 1,\n            \"discount_amount\": 0\n        }\n    ],\n    \"initial_payment\": {\n        \"amount\": 610000,\n        \"payment_method\": \"CASH\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/transactions",
+							"host": ["{{base_url}}"],
+							"path": ["transactions"]
+						},
+						"description": "Buat transaksi dengan pembayaran lunas langsung. Status akan jadi PAID dan service reminder akan dihitung."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Transaction - DP/Cicilan",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"vehicle_id\": 2,\n    \"mechanic_id\": 2,\n    \"current_km\": 17500,\n    \"discount_amount\": 0,\n    \"notes\": \"Ganti kampas rem + minyak rem\",\n    \"items\": [\n        {\n            \"item_type\": \"PRODUCT\",\n            \"item_id\": 3,\n            \"qty\": 1\n        },\n        {\n            \"item_type\": \"PRODUCT\",\n            \"item_id\": 4,\n            \"qty\": 1\n        },\n        {\n            \"item_type\": \"SERVICE\",\n            \"item_id\": 5,\n            \"qty\": 1\n        }\n    ],\n    \"initial_payment\": {\n        \"amount\": 200000,\n        \"payment_method\": \"TRANSFER\",\n        \"reference_number\": \"TRF-BCA-123456\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/transactions",
+							"host": ["{{base_url}}"],
+							"path": ["transactions"]
+						},
+						"description": "Buat transaksi dengan pembayaran sebagian (DP). Status akan jadi PARTIAL."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Transaction - Walk-in (Tanpa Kendaraan)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"vehicle_id\": null,\n    \"mechanic_id\": null,\n    \"current_km\": null,\n    \"discount_amount\": 0,\n    \"notes\": \"Pembelian langsung - tanpa service\",\n    \"items\": [\n        {\n            \"item_type\": \"PRODUCT\",\n            \"item_id\": 1,\n            \"qty\": 2,\n            \"discount_amount\": 10000\n        },\n        {\n            \"item_type\": \"PRODUCT\",\n            \"item_id\": 9,\n            \"qty\": 2\n        }\n    ],\n    \"initial_payment\": {\n        \"amount\": 870000,\n        \"payment_method\": \"QRIS\",\n        \"reference_number\": \"QRIS-2024011512345\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/transactions",
+							"host": ["{{base_url}}"],
+							"path": ["transactions"]
+						},
+						"description": "Buat transaksi untuk pembelian langsung tanpa kendaraan (walk-in customer)."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Transaction - External Service",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"vehicle_id\": 3,\n    \"mechanic_id\": 1,\n    \"current_km\": 36000,\n    \"discount_amount\": 0,\n    \"notes\": \"Service AC dan cuci body\",\n    \"items\": [\n        {\n            \"item_type\": \"SERVICE\",\n            \"item_id\": 6,\n            \"qty\": 1\n        },\n        {\n            \"item_type\": \"EXTERNAL\",\n            \"item_name\": \"Cuci Body Premium\",\n            \"base_price\": 75000,\n            \"vendor_name\": \"CV Kinclong Jaya\",\n            \"qty\": 1\n        },\n        {\n            \"item_type\": \"EXTERNAL\",\n            \"item_name\": \"Poles Body Nano Coating\",\n            \"base_price\": 500000,\n            \"vendor_name\": \"CV Kinclong Jaya\",\n            \"qty\": 1\n        }\n    ],\n    \"initial_payment\": {\n        \"amount\": 675000,\n        \"payment_method\": \"DEBIT\",\n        \"reference_number\": \"EDC-BRI-789012\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/transactions",
+							"host": ["{{base_url}}"],
+							"path": ["transactions"]
+						},
+						"description": "Buat transaksi dengan external service (vendor luar)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/transactions?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["transactions"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "20"},
+								{"key": "status", "value": "PAID", "disabled": true},
+								{"key": "vehicle_id", "value": "1", "disabled": true},
+								{"key": "mechanic_id", "value": "1", "disabled": true},
+								{"key": "date_from", "value": "2024-01-01", "disabled": true},
+								{"key": "date_to", "value": "2024-12-31", "disabled": true},
+								{"key": "sort_by", "value": "date", "disabled": true},
+								{"key": "sort_order", "value": "DESC", "disabled": true}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Transaction by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/transactions/1",
+							"host": ["{{base_url}}"],
+							"path": ["transactions", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Transaction for Print - Receipt",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/transactions/1/print?type=receipt",
+							"host": ["{{base_url}}"],
+							"path": ["transactions", "1", "print"],
+							"query": [
+								{"key": "type", "value": "receipt"}
+							]
+						},
+						"description": "Get transaction data formatted for receipt printing. Shows package names only."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Transaction for Print - Work Order",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/transactions/1/print?type=work_order",
+							"host": ["{{base_url}}"],
+							"path": ["transactions", "1", "print"],
+							"query": [
+								{"key": "type", "value": "work_order"}
+							]
+						},
+						"description": "Get transaction data formatted for work order. Shows exploded package items."
+					},
+					"response": []
+				},
+				{
+					"name": "Add Payment (Pelunasan)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 110000,\n    \"payment_method\": \"TRANSFER\",\n    \"reference_number\": \"TRF-BCA-789012\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/transactions/8/pay",
+							"host": ["{{base_url}}"],
+							"path": ["transactions", "8", "pay"]
+						},
+						"description": "Tambah pembayaran ke transaksi. Jika lunas, status berubah ke PAID dan service reminder dihitung."
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Transaction (Admin)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"reason\": \"Customer membatalkan service\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/transactions/99/cancel",
+							"host": ["{{base_url}}"],
+							"path": ["transactions", "99", "cancel"]
+						},
+						"description": "Batalkan transaksi. Stok akan dikembalikan. Hanya ADMIN yang bisa cancel."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "💳 Payments",
+			"item": [
+				{
+					"name": "Get All Payments",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/payments?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["payments"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "20"},
+								{"key": "transaction_id", "value": "1", "disabled": true},
+								{"key": "payment_method", "value": "CASH", "disabled": true},
+								{"key": "date_from", "value": "2024-01-01", "disabled": true},
+								{"key": "date_to", "value": "2024-12-31", "disabled": true}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Payment by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/payments/1",
+							"host": ["{{base_url}}"],
+							"path": ["payments", "1"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📊 Inventory",
+			"item": [
+				{
+					"name": "Get Inventory Logs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/inventory?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["inventory"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "20"},
+								{"key": "product_id", "value": "1", "disabled": true},
+								{"key": "type", "value": "IN", "disabled": true},
+								{"key": "date_from", "value": "2024-01-01", "disabled": true},
+								{"key": "date_to", "value": "2024-12-31", "disabled": true}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Stock In (Tambah Stok)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"product_id\": 1,\n    \"qty\": 10,\n    \"buy_price\": 45000,\n    \"notes\": \"Restock dari supplier PT ABC\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/inventory/in",
+							"host": ["{{base_url}}"],
+							"path": ["inventory", "in"]
+						},
+						"description": "Tambah stok barang masuk dengan perhitungan HPP Moving Average"
+					},
+					"response": []
+				},
+				{
+					"name": "Add Inventory Log",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"productId\": 1,\n    \"qty\": -2,\n    \"type\": \"ADJUSTMENT\",\n    \"notes\": \"Barang rusak - manual adjustment\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/inventory",
+							"host": ["{{base_url}}"],
+							"path": ["inventory"]
+						},
+						"description": "Manual inventory log entry (IN/OUT/ADJUSTMENT)"
+					},
+					"response": []
+				},
+				{
+					"name": "📋 Stock Audit (Single Product)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"product_id\": 1,\n    \"actual_qty\": 48,\n    \"notes\": \"Stock opname bulanan\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/inventory/stock-audit",
+							"host": ["{{base_url}}"],
+							"path": ["inventory", "stock-audit"]
+						},
+						"description": "Penyesuaian stok berdasarkan hasil stock opname (tidak mempengaruhi laporan penjualan)"
+					},
+					"response": []
+				},
+				{
+					"name": "📋 Stock Audit Bulk",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"items\": [\n        {\"product_id\": 1, \"actual_qty\": 48},\n        {\"product_id\": 2, \"actual_qty\": 25},\n        {\"product_id\": 3, \"actual_qty\": 100}\n    ],\n    \"notes\": \"Stock opname bulanan Februari 2026\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/inventory/stock-audit/bulk",
+							"host": ["{{base_url}}"],
+							"path": ["inventory", "stock-audit", "bulk"]
+						},
+						"description": "Stock opname untuk banyak produk sekaligus"
+					},
+					"response": []
+				},
+				{
+					"name": "📋 Stock Audit History",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/inventory/stock-audit/history?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["inventory", "stock-audit", "history"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "20"},
+								{"key": "product_id", "value": "", "disabled": true},
+								{"key": "date_from", "value": "", "disabled": true},
+								{"key": "date_to", "value": "", "disabled": true}
+							]
+						},
+						"description": "Riwayat stock audit/opname"
+					},
+					"response": []
+				},
+				{
+					"name": "📋 Stock Audit Report",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/inventory/stock-audit/report",
+							"host": ["{{base_url}}"],
+							"path": ["inventory", "stock-audit", "report"],
+							"query": [
+								{"key": "date_from", "value": "", "disabled": true},
+								{"key": "date_to", "value": "", "disabled": true}
+							]
+						},
+						"description": "Laporan selisih stok dari hasil audit"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "💸 Expenses",
+			"item": [
+				{
+					"name": "Get All Expenses",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/expenses?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["expenses"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "20"},
+								{"key": "category", "value": "", "disabled": true},
+								{"key": "date_from", "value": "2024-01-01", "disabled": true},
+								{"key": "date_to", "value": "2024-12-31", "disabled": true}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Expense by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/expenses/1",
+							"host": ["{{base_url}}"],
+							"path": ["expenses", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Expense",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"category\": \"Operasional\",\n    \"description\": \"Bayar listrik bulan Januari\",\n    \"amount\": 500000,\n    \"date\": \"2024-01-15\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/expenses",
+							"host": ["{{base_url}}"],
+							"path": ["expenses"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Expense",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 550000,\n    \"description\": \"Bayar listrik bulan Januari (revisi)\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/expenses/1",
+							"host": ["{{base_url}}"],
+							"path": ["expenses", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Expense",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/expenses/99",
+							"host": ["{{base_url}}"],
+							"path": ["expenses", "99"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📈 Reports",
+			"item": [
+				{
+					"name": "Dashboard Report",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/reports/dashboard",
+							"host": ["{{base_url}}"],
+							"path": ["reports", "dashboard"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Financial Report",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/reports/financial?date_from=2024-01-01&date_to=2024-01-31",
+							"host": ["{{base_url}}"],
+							"path": ["reports", "financial"],
+							"query": [
+								{"key": "date_from", "value": "2024-01-01"},
+								{"key": "date_to", "value": "2024-01-31"}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Inventory Report",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/reports/inventory",
+							"host": ["{{base_url}}"],
+							"path": ["reports", "inventory"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Sales Report",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/reports/sales?date_from=2024-01-01&date_to=2024-01-31&group_by=day",
+							"host": ["{{base_url}}"],
+							"path": ["reports", "sales"],
+							"query": [
+								{"key": "date_from", "value": "2024-01-01"},
+								{"key": "date_to", "value": "2024-01-31"},
+								{"key": "group_by", "value": "day"}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "⚙️ Settings",
+			"item": [
+				{
+					"name": "Get Settings",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/settings",
+							"host": ["{{base_url}}"],
+							"path": ["settings"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Settings (Admin)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"shop_name\": \"AutoWorkshop - Bengkel Mobil Terpercaya\",\n    \"shop_address\": \"Jl. Raya Serpong No. 123, Tangerang Selatan\",\n    \"shop_phone\": \"021-12345678\",\n    \"printer_width\": \"80mm\",\n    \"footer_message\": \"Terima kasih telah mempercayakan kendaraan Anda kepada kami!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/settings",
+							"host": ["{{base_url}}"],
+							"path": ["settings"]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

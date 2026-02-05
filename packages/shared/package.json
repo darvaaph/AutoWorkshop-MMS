@@ -1,0 +1,19 @@
+{
+  "name": "shared",
+  "version": "1.0.0",
+  "description": "Shared utilities and constants for AutoWorkshop MMS",
+  "main": "src/index.js",
+  "scripts": {
+    "build": "echo 'Building shared package...'",
+    "test": "echo 'Running tests for shared package...'"
+  },
+  "keywords": [
+    "autoworkshop",
+    "shared",
+    "utilities"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}
