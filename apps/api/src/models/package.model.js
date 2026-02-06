@@ -26,6 +26,11 @@ Package.init({
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
+  image_url: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'URL path to package banner/promotional image'
+  },
   deletedAt: {
     type: DataTypes.DATE,
     allowNull: true,

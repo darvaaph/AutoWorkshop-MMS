@@ -1,6 +1,8 @@
 // packages.controller.js
 
 const { Op } = require('sequelize');
+const fs = require('fs');
+const path = require('path');
 const Package = require('../models/package.model');
 const PackageItem = require('../models/package-item.model');
 const Product = require('../models/product.model');
@@ -35,9 +37,7 @@ exports.getAllPackages = async (req, res) => {
             order: [['name', 'ASC']],
             limit: parseInt(limit),
             offset,
-            attributes: {
-                exclude: ['deleted_at']
-            },
+            attributes: ['id', 'name', 'price', 'description', 'is_active', 'image_url', 'createdAt', 'updatedAt'],
             include: [
                 {
                     model: PackageItem,
@@ -147,7 +147,7 @@ exports.getPackageById = async (req, res) => {
 
         const pkg = await Package.findOne({
             where: { id, deleted_at: null },
-            attributes: { exclude: ['deleted_at'] },
+            attributes: ['id', 'name', 'price', 'description', 'is_active', 'image_url', 'createdAt', 'updatedAt'],
             include: [
                 {
                     model: PackageItem,
@@ -272,6 +272,35 @@ exports.createPackage = async (req, res) => {
             });
         }
 
+        // Handle image upload if provided
+        let imageUrl = null;
+        if (req.file) {
+            // Validate file type
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+            if (!allowedTypes.includes(req.file.mimetype)) {
+                fs.unlinkSync(req.file.path);
+                await t.rollback();
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid file type. Only JPEG, PNG, and GIF are allowed'
+                });
+            }
+
+            // Validate file size (max 2MB)
+            const maxSize = 2 * 1024 * 1024; // 2MB
+            if (req.file.size > maxSize) {
+                fs.unlinkSync(req.file.path);
+                await t.rollback();
+                return res.status(400).json({
+                    success: false,
+                    message: 'File too large. Maximum size is 2MB'
+                });
+            }
+
+            // Generate image URL
+            imageUrl = `/uploads/packages/${req.file.filename}`;
+        }
+
         // Validate items exist
         for (const item of items) {
             if (!item.product_id && !item.service_id) {
@@ -314,7 +343,8 @@ exports.createPackage = async (req, res) => {
             name,
             price,
             description,
-            is_active
+            is_active,
+            image_url: imageUrl
         }, { transaction: t });
 
         // Create package items in bulk
@@ -331,7 +361,7 @@ exports.createPackage = async (req, res) => {
 
         // Audit log
         await auditService.logCreate(req.user?.id, 'packages', pkg.id, {
-            name, price, items_count: items.length
+            name, price, description, is_active, image_url: imageUrl, items_count: items.length
         }, req);
 
         // Fetch complete package with items
@@ -387,13 +417,51 @@ exports.updatePackage = async (req, res) => {
             });
         }
 
+        // Handle image upload if provided
+        let finalImageUrl = undefined;
+        if (req.file) {
+            // Validate file type
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+            if (!allowedTypes.includes(req.file.mimetype)) {
+                fs.unlinkSync(req.file.path);
+                await t.rollback();
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid file type. Only JPEG, PNG, and GIF are allowed'
+                });
+            }
+
+            // Validate file size (max 2MB)
+            const maxSize = 2 * 1024 * 1024; // 2MB
+            if (req.file.size > maxSize) {
+                fs.unlinkSync(req.file.path);
+                await t.rollback();
+                return res.status(400).json({
+                    success: false,
+                    message: 'File too large. Maximum size is 2MB'
+                });
+            }
+
+            // Generate image URL
+            finalImageUrl = `/uploads/packages/${req.file.filename}`;
+        }
+
         // Update package header
         await pkg.update({
             name: name || pkg.name,
             price: price !== undefined ? price : pkg.price,
             description: description !== undefined ? description : pkg.description,
-            is_active: is_active !== undefined ? is_active : pkg.is_active
+            is_active: is_active !== undefined ? is_active : pkg.is_active,
+            image_url: finalImageUrl !== undefined ? finalImageUrl : pkg.image_url
         }, { transaction: t });
+
+        // Delete old image file if new image is uploaded
+        if (req.file && pkg.image_url && pkg.image_url.startsWith('/uploads/')) {
+            const oldImagePath = path.join(__dirname, '../../public', pkg.image_url);
+            if (fs.existsSync(oldImagePath)) {
+                fs.unlinkSync(oldImagePath);
+            }
+        }
 
         // If items provided, replace all items
         if (items && Array.isArray(items)) {
@@ -453,10 +521,25 @@ exports.updatePackage = async (req, res) => {
 
         await t.commit();
 
+        const oldValues = {
+            name: pkg.name,
+            price: pkg.price,
+            description: pkg.description,
+            is_active: pkg.is_active,
+            image_url: pkg.image_url
+        };
+
         // Audit log
         await auditService.logUpdate(req.user?.id, 'packages', pkg.id, 
-            { name: pkg.name, price: pkg.price },
-            { name: name || pkg.name, price: price !== undefined ? price : pkg.price, items_updated: items ? true : false },
+            oldValues,
+            { 
+                name: pkg.name, 
+                price: pkg.price, 
+                description: pkg.description,
+                is_active: pkg.is_active,
+                image_url: pkg.image_url,
+                items_updated: items ? true : false 
+            },
             req
         );
 
@@ -636,3 +719,90 @@ exports.checkPackageAvailability = async (req, res) => {
         });
     }
 };
+
+/**
+ * Upload package image
+ * POST /api/packages/:id/upload-image
+ */
+exports.uploadPackageImage = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'No image file provided'
+            });
+        }
+
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+        if (!allowedTypes.includes(req.file.mimetype)) {
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid file type. Only JPEG, PNG, and GIF are allowed'
+            });
+        }
+
+        // Validate file size (max 2MB)
+        const maxSize = 2 * 1024 * 1024; // 2MB
+        if (req.file.size > maxSize) {
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({
+                success: false,
+                message: 'File too large. Maximum size is 2MB'
+            });
+        }
+
+        const pkg = await Package.findByPk(id);
+
+        if (!pkg) {
+            fs.unlinkSync(req.file.path);
+            return res.status(404).json({
+                success: false,
+                message: 'Package not found'
+            });
+        }
+
+        // Delete old image file if exists
+        if (pkg.image_url && pkg.image_url.startsWith('/uploads/')) {
+            const oldImagePath = path.join(__dirname, '../../public', pkg.image_url);
+            if (fs.existsSync(oldImagePath)) {
+                fs.unlinkSync(oldImagePath);
+            }
+        }
+
+        // Generate image URL
+        const imageUrl = `/uploads/packages/${req.file.filename}`;
+
+        // Update package with new image URL
+        const oldValues = { image_url: pkg.image_url };
+        await pkg.update({ image_url: imageUrl });
+
+        // Audit log
+        await auditService.logUpdate(req.user?.id, 'packages', pkg.id, oldValues, {
+            image_url: imageUrl
+        }, req);
+
+        res.status(200).json({
+            success: true,
+            message: 'Package image uploaded successfully',
+            data: {
+                package_id: pkg.id,
+                image_url: imageUrl
+            }
+        });
+    } catch (error) {
+        // Delete uploaded file on error
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        console.error('Upload package image error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error uploading package image',
+            error: error.message
+        });
+    }
+};;
