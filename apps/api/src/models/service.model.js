@@ -19,6 +19,11 @@ Service.init({
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
   },
+  image_url: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'URL path to service illustration image'
+  },
   deletedAt: {
     type: DataTypes.DATE,
     allowNull: true,
