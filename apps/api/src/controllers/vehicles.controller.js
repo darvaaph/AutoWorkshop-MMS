@@ -1,6 +1,8 @@
 // vehicles.controller.js
 
 const { Op } = require('sequelize');
+const fs = require('fs');
+const path = require('path');
 const Vehicle = require('../models/vehicle.model');
 const Customer = require('../models/customer.model');
 const auditService = require('../services/audit.service');
@@ -8,7 +10,9 @@ const auditService = require('../services/audit.service');
 // Get all vehicles
 exports.getAllVehicles = async (req, res) => {
     try {
-        const vehicles = await Vehicle.findAll();
+        const vehicles = await Vehicle.findAll({
+            attributes: ['id', 'customer_id', 'license_plate', 'brand', 'model', 'current_km', 'next_service_date', 'next_service_km', 'reminder_sent_at', 'reminder_sent_by', 'reminder_notes', 'image_url', 'createdAt', 'updatedAt']
+        });
         res.status(200).json(vehicles);
     } catch (error) {
         res.status(500).json({ message: 'Error retrieving vehicles', error });
@@ -19,7 +23,9 @@ exports.getAllVehicles = async (req, res) => {
 exports.getVehicleById = async (req, res) => {
     const { id } = req.params;
     try {
-        const vehicle = await Vehicle.findByPk(id);
+        const vehicle = await Vehicle.findByPk(id, {
+            attributes: ['id', 'customer_id', 'license_plate', 'brand', 'model', 'current_km', 'next_service_date', 'next_service_km', 'reminder_sent_at', 'reminder_sent_by', 'reminder_notes', 'image_url', 'createdAt', 'updatedAt']
+        });
         if (!vehicle) {
             return res.status(404).json({ message: 'Vehicle not found' });
         }
@@ -33,11 +39,38 @@ exports.getVehicleById = async (req, res) => {
 exports.createVehicle = async (req, res) => {
     const { customer_id, license_plate, brand, model, current_km } = req.body;
     try {
-        const newVehicle = await Vehicle.create({ customer_id, license_plate, brand, model, current_km });
+        // Handle image upload if provided
+        let imageUrl = null;
+        if (req.file) {
+            // Validate file type
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+            if (!allowedTypes.includes(req.file.mimetype)) {
+                fs.unlinkSync(req.file.path);
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid file type. Only JPEG, PNG, and GIF are allowed'
+                });
+            }
+
+            // Validate file size (max 2MB)
+            const maxSize = 2 * 1024 * 1024; // 2MB
+            if (req.file.size > maxSize) {
+                fs.unlinkSync(req.file.path);
+                return res.status(400).json({
+                    success: false,
+                    message: 'File too large. Maximum size is 2MB'
+                });
+            }
+
+            // Generate image URL
+            imageUrl = `/uploads/vehicles/${req.file.filename}`;
+        }
+
+        const newVehicle = await Vehicle.create({ customer_id, license_plate, brand, model, current_km, image_url: imageUrl });
         
         // Audit log
         await auditService.logCreate(req.user?.id, 'vehicles', newVehicle.id, {
-            customer_id, license_plate, brand, model
+            customer_id, license_plate, brand, model, image_url: imageUrl
         }, req);
         
         res.status(201).json(newVehicle);
@@ -55,6 +88,33 @@ exports.updateVehicle = async (req, res) => {
         if (!vehicle) {
             return res.status(404).json({ message: 'Vehicle not found' });
         }
+
+        // Handle image upload if provided
+        let finalImageUrl = undefined;
+        if (req.file) {
+            // Validate file type
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+            if (!allowedTypes.includes(req.file.mimetype)) {
+                fs.unlinkSync(req.file.path);
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid file type. Only JPEG, PNG, and GIF are allowed'
+                });
+            }
+
+            // Validate file size (max 2MB)
+            const maxSize = 2 * 1024 * 1024; // 2MB
+            if (req.file.size > maxSize) {
+                fs.unlinkSync(req.file.path);
+                return res.status(400).json({
+                    success: false,
+                    message: 'File too large. Maximum size is 2MB'
+                });
+            }
+
+            // Generate image URL
+            finalImageUrl = `/uploads/vehicles/${req.file.filename}`;
+        }
         
         const oldValues = { 
             customer_id: vehicle.customer_id,
@@ -63,7 +123,8 @@ exports.updateVehicle = async (req, res) => {
             model: vehicle.model,
             current_km: vehicle.current_km,
             next_service_date: vehicle.next_service_date,
-            next_service_km: vehicle.next_service_km
+            next_service_km: vehicle.next_service_km,
+            image_url: vehicle.image_url
         };
         
         // Only update fields that are provided
@@ -75,6 +136,15 @@ exports.updateVehicle = async (req, res) => {
         if (current_km !== undefined) updateData.current_km = current_km;
         if (next_service_date !== undefined) updateData.next_service_date = next_service_date;
         if (next_service_km !== undefined) updateData.next_service_km = next_service_km;
+        if (finalImageUrl !== undefined) updateData.image_url = finalImageUrl;
+        
+        // Delete old image file if new image is uploaded
+        if (req.file && vehicle.image_url && vehicle.image_url.startsWith('/uploads/')) {
+            const oldImagePath = path.join(__dirname, '../../public', vehicle.image_url);
+            if (fs.existsSync(oldImagePath)) {
+                fs.unlinkSync(oldImagePath);
+            }
+        }
         
         await vehicle.update(updateData);
         
@@ -87,7 +157,8 @@ exports.updateVehicle = async (req, res) => {
                 model: vehicle.model,
                 current_km: vehicle.current_km,
                 next_service_date: vehicle.next_service_date,
-                next_service_km: vehicle.next_service_km
+                next_service_km: vehicle.next_service_km,
+                image_url: vehicle.image_url
             }, req);
         } catch (auditError) {
             console.warn('Audit logging failed:', auditError.message);
@@ -250,5 +321,92 @@ exports.resetReminderStatus = async (req, res) => {
     } catch (error) {
         console.error('Error resetting reminder status:', error);
         res.status(500).json({ message: 'Error resetting reminder status', error: error.message });
+    }
+};
+
+/**
+ * Upload vehicle image
+ * POST /api/vehicles/:id/upload-image
+ */
+exports.uploadVehicleImage = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'No image file provided'
+            });
+        }
+
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+        if (!allowedTypes.includes(req.file.mimetype)) {
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid file type. Only JPEG, PNG, and GIF are allowed'
+            });
+        }
+
+        // Validate file size (max 2MB)
+        const maxSize = 2 * 1024 * 1024; // 2MB
+        if (req.file.size > maxSize) {
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({
+                success: false,
+                message: 'File too large. Maximum size is 2MB'
+            });
+        }
+
+        const vehicle = await Vehicle.findByPk(id);
+
+        if (!vehicle) {
+            fs.unlinkSync(req.file.path);
+            return res.status(404).json({
+                success: false,
+                message: 'Vehicle not found'
+            });
+        }
+
+        // Delete old image file if exists
+        if (vehicle.image_url && vehicle.image_url.startsWith('/uploads/')) {
+            const oldImagePath = path.join(__dirname, '../../public', vehicle.image_url);
+            if (fs.existsSync(oldImagePath)) {
+                fs.unlinkSync(oldImagePath);
+            }
+        }
+
+        // Generate image URL
+        const imageUrl = `/uploads/vehicles/${req.file.filename}`;
+
+        // Update vehicle with new image URL
+        const oldValues = { image_url: vehicle.image_url };
+        await vehicle.update({ image_url: imageUrl });
+
+        // Audit log
+        await auditService.logUpdate(req.user?.id, 'vehicles', vehicle.id, oldValues, {
+            image_url: imageUrl
+        }, req);
+
+        res.status(200).json({
+            success: true,
+            message: 'Vehicle image uploaded successfully',
+            data: {
+                vehicle_id: vehicle.id,
+                image_url: imageUrl
+            }
+        });
+    } catch (error) {
+        // Delete uploaded file on error
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        console.error('Upload vehicle image error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error uploading vehicle image',
+            error: error.message
+        });
     }
 };

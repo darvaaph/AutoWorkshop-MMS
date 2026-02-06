@@ -21,6 +21,11 @@ const Customer = sequelize.define('Customer', {
         type: DataTypes.TEXT,
         allowNull: true,
     },
+    photo_url: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'URL path to customer photo for identification'
+    },
     deletedAt: {
         type: DataTypes.DATE,
         allowNull: true,

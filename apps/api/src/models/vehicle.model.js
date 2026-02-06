@@ -56,6 +56,11 @@ Vehicle.init({
     type: DataTypes.TEXT,
     allowNull: true,
   },
+  image_url: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'URL path to vehicle image/photo for identification'
+  },
   deletedAt: {
     type: DataTypes.DATE,
     allowNull: true,

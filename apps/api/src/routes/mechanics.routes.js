@@ -23,8 +23,20 @@ const upload = multer({
     storage: storage,
     limits: {
         fileSize: 2 * 1024 * 1024 // 2MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        // Accept empty files (when no photo is uploaded)
+        cb(null, true);
     }
 });
+
+// Optional upload middleware - only processes if photo field exists
+const optionalUpload = (req, res, next) => {
+    if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
+        return upload.single('photo')(req, res, next);
+    }
+    next();
+};
 
 // All routes require authentication
 router.use(verifyToken);
@@ -43,10 +55,10 @@ router.put('/:id/details', requireRole('ADMIN'), mechanicsController.updateMecha
 router.get('/:id', mechanicsController.getMechanicById);
 
 // Create a new mechanic
-router.post('/', requireRole('ADMIN'), upload.single('photo'), mechanicsController.createMechanic);
+router.post('/', requireRole('ADMIN'), optionalUpload, mechanicsController.createMechanic);
 
 // Update a mechanic by ID
-router.put('/:id', requireRole('ADMIN'), upload.single('photo'), mechanicsController.updateMechanic);
+router.put('/:id', requireRole('ADMIN'), optionalUpload, mechanicsController.updateMechanic);
 
 // Delete a mechanic by ID
 router.delete('/:id', requireRole('ADMIN'), mechanicsController.deleteMechanic);

@@ -24,8 +24,20 @@ const upload = multer({
     storage: storage,
     limits: {
         fileSize: 2 * 1024 * 1024 // 2MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        // Accept empty files (when no image is uploaded)
+        cb(null, true);
     }
 });
+
+// Optional upload middleware - only processes if image field exists
+const optionalUpload = (req, res, next) => {
+    if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
+        return upload.single('image')(req, res, next);
+    }
+    next();
+};
 
 // Public routes
 router.get('/', servicesController.getAllServices);
@@ -36,8 +48,8 @@ router.post('/:id/upload-image', verifyToken, requireRole('ADMIN'), upload.singl
 router.get('/:id', servicesController.getServiceById);
 
 // Protected routes (Admin only)
-router.post('/', verifyToken, requireRole('ADMIN'), upload.single('image'), validateService, servicesController.createService);
-router.put('/:id', verifyToken, requireRole('ADMIN'), upload.single('image'), servicesController.updateService);
+router.post('/', verifyToken, requireRole('ADMIN'), optionalUpload, validateService, servicesController.createService);
+router.put('/:id', verifyToken, requireRole('ADMIN'), optionalUpload, servicesController.updateService);
 router.delete('/:id', verifyToken, requireRole('ADMIN'), servicesController.deleteService);
 
 module.exports = router;
