@@ -18,6 +18,26 @@ Mechanic.init({
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
+  photo_url: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'URL path to mechanic profile photo'
+  },
+  phone: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'Mechanic phone number'
+  },
+  address: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    comment: 'Mechanic residential address'
+  },
+  emergency_contact: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'Emergency contact information'
+  },
   deletedAt: {
     type: DataTypes.DATE,
     allowNull: true,
