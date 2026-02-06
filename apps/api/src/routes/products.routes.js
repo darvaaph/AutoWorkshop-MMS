@@ -36,4 +36,9 @@ router.post('/:id/upload-image', verifyToken, requireRole('ADMIN'), upload.singl
 
 router.get('/:id', productsController.getProductById);
 
+// Protected routes (Admin only)
+router.post('/', verifyToken, requireRole('ADMIN'), upload.single('image'), validateProduct, productsController.createProduct);
+router.put('/:id', verifyToken, requireRole('ADMIN'), upload.single('image'), productsController.updateProduct);
+router.delete('/:id', verifyToken, requireRole('ADMIN'), productsController.deleteProduct);
+
 module.exports = router;
