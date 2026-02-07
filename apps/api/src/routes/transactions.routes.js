@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const transactionsController = require('../controllers/transactions.controller');
 const { verifyToken, requireRole } = require('../middleware/auth.middleware');
-const { validateTransaction, validatePayment } = require('../middleware/validation.middleware');
+const { validateTransaction, validatePayment, handleValidationErrors } = require('../middleware/validation.middleware');
 
 // All routes require authentication
 router.use(verifyToken);
@@ -12,7 +12,7 @@ router.use(verifyToken);
  * @desc    Create new transaction (POS)
  * @access  Private (ADMIN, CASHIER)
  */
-router.post('/', validateTransaction, transactionsController.createTransaction);
+router.post('/', validateTransaction, handleValidationErrors, transactionsController.createTransaction);
 
 /**
  * @route   GET /api/transactions

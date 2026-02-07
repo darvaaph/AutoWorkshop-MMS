@@ -1,6 +1,73 @@
 // Validation middleware using express-validator
 
-const { body, param, query } = require('express-validator');
+const { body, param, query, validationResult } = require('express-validator');
+
+// ==================== VALIDATION ERROR HANDLER ====================
+
+/**
+ * Middleware to handle validation errors from express-validator
+ * Returns detailed, user-friendly error messages
+ */
+const handleValidationErrors = (req, res, next) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+        // Group errors by field for better organization
+        const fieldErrors = {};
+        const generalErrors = [];
+
+        errors.array().forEach(error => {
+            if (error.path && error.path.includes('.')) {
+                // Handle nested field errors (e.g., items.*.item_type)
+                const pathParts = error.path.split('.');
+                const field = pathParts[0];
+                const subField = pathParts.slice(1).join('.');
+
+                if (!fieldErrors[field]) {
+                    fieldErrors[field] = [];
+                }
+
+                // Add item index for array fields
+                const itemIndex = error.location === 'body' && req.body[field] && Array.isArray(req.body[field])
+                    ? `Item ${parseInt(pathParts[1]) + 1}: `
+                    : '';
+
+                fieldErrors[field].push(`${itemIndex}${error.msg}`);
+            } else {
+                // Handle general field errors
+                if (error.path) {
+                    if (!fieldErrors[error.path]) {
+                        fieldErrors[error.path] = [];
+                    }
+                    fieldErrors[error.path].push(error.msg);
+                } else {
+                    generalErrors.push(error.msg);
+                }
+            }
+        });
+
+        // Format response
+        const errorResponse = {
+            success: false,
+            message: 'Validation failed',
+            errors: fieldErrors,
+            code: 'VALIDATION_ERROR'
+        };
+
+        // Add general errors if any
+        if (generalErrors.length > 0) {
+            errorResponse.general_errors = generalErrors;
+        }
+
+        // Add summary for quick reference
+        const totalErrors = Object.values(fieldErrors).reduce((sum, arr) => sum + arr.length, 0) + generalErrors.length;
+        errorResponse.summary = `${totalErrors} validation error(s) found`;
+
+        return res.status(400).json(errorResponse);
+    }
+
+    next();
+};
 
 // ==================== AUTH VALIDATORS ====================
 
@@ -210,63 +277,158 @@ const validateMechanic = [
 // ==================== TRANSACTION VALIDATORS ====================
 
 const validateTransaction = [
+    // Basic transaction fields
     body('vehicle_id')
-        .optional()
+        .optional({ nullable: true, checkFalsy: true })
         .isInt({ min: 1 })
-        .withMessage('Vehicle ID harus berupa angka positif'),
+        .withMessage('Vehicle ID harus berupa angka positif yang valid'),
+
     body('mechanic_id')
-        .optional()
+        .optional({ nullable: true, checkFalsy: true })
         .isInt({ min: 1 })
-        .withMessage('Mechanic ID harus berupa angka positif'),
+        .withMessage('Mechanic ID harus berupa angka positif yang valid'),
+
     body('current_km')
-        .optional()
-        .isInt({ min: 0 })
-        .withMessage('KM harus berupa angka positif'),
+        .optional({ nullable: true, checkFalsy: true })
+        .isInt({ min: 0, max: 999999 })
+        .withMessage('Current KM harus berupa angka antara 0-999999'),
+
     body('discount_amount')
-        .optional()
+        .optional({ nullable: true, checkFalsy: true })
         .isFloat({ min: 0 })
-        .withMessage('Diskon harus berupa angka positif'),
+        .withMessage('Discount amount harus berupa angka positif atau nol'),
+
+    body('notes')
+        .optional({ nullable: true, checkFalsy: true })
+        .trim()
+        .isLength({ max: 500 })
+        .withMessage('Notes maksimal 500 karakter'),
+
+    // Items validation - comprehensive
     body('items')
-        .isArray({ min: 1 })
-        .withMessage('Transaksi harus memiliki minimal 1 item'),
+        .exists({ checkFalsy: true })
+        .withMessage('Items wajib diisi dan tidak boleh kosong')
+        .isArray({ min: 1, max: 50 })
+        .withMessage('Transaksi harus memiliki 1-50 item'),
+
     body('items.*.item_type')
+        .exists()
+        .withMessage('Setiap item harus memiliki item_type')
         .isIn(['PRODUCT', 'SERVICE', 'PACKAGE', 'EXTERNAL'])
-        .withMessage('Tipe item harus PRODUCT, SERVICE, PACKAGE, atau EXTERNAL'),
+        .withMessage('Item type harus salah satu dari: PRODUCT, SERVICE, PACKAGE, atau EXTERNAL'),
+
+    // Conditional validation based on item_type
     body('items.*.item_id')
-        .optional()
+        .if(body('items.*.item_type').isIn(['PRODUCT', 'SERVICE', 'PACKAGE']))
+        .exists()
+        .withMessage('item_id wajib diisi untuk PRODUCT, SERVICE, dan PACKAGE')
         .isInt({ min: 1 })
         .withMessage('Item ID harus berupa angka positif'),
-    body('items.*.qty')
-        .optional()
-        .isInt({ min: 1 })
-        .withMessage('Quantity harus minimal 1'),
-    body('items.*.discount_amount')
-        .optional()
-        .isFloat({ min: 0 })
-        .withMessage('Diskon item harus berupa angka positif'),
+
     body('items.*.item_name')
-        .optional()
+        .if(body('items.*.item_type').equals('EXTERNAL'))
+        .exists()
+        .withMessage('item_name wajib diisi untuk item EXTERNAL')
         .trim()
         .notEmpty()
-        .withMessage('Nama item external wajib diisi'),
+        .withMessage('Nama item external tidak boleh kosong')
+        .isLength({ min: 2, max: 100 })
+        .withMessage('Nama item external harus 2-100 karakter'),
+
     body('items.*.base_price')
-        .optional()
+        .if(body('items.*.item_type').equals('EXTERNAL'))
+        .exists()
+        .withMessage('base_price wajib diisi untuk item EXTERNAL')
+        .isFloat({ min: 0.01 })
+        .withMessage('Base price untuk external item minimal 0.01'),
+
+    body('items.*.qty')
+        .exists()
+        .withMessage('Quantity wajib diisi untuk setiap item')
+        .isInt({ min: 1, max: 100 })
+        .withMessage('Quantity harus antara 1-100'),
+
+    body('items.*.discount_amount')
+        .optional({ nullable: true, checkFalsy: true })
         .isFloat({ min: 0 })
-        .withMessage('Harga harus berupa angka positif'),
+        .withMessage('Discount amount per item harus berupa angka positif atau nol'),
+
+    body('items.*.custom_price')
+        .optional({ nullable: true, checkFalsy: true })
+        .isFloat({ min: 0.01 })
+        .withMessage('Custom price harus berupa angka positif minimal 0.01'),
+
+    body('items.*.cost_price')
+        .optional({ nullable: true, checkFalsy: true })
+        .isFloat({ min: 0 })
+        .withMessage('Cost price harus berupa angka positif atau nol'),
+
     body('items.*.vendor_name')
-        .optional()
-        .trim(),
+        .optional({ nullable: true, checkFalsy: true })
+        .trim()
+        .isLength({ max: 100 })
+        .withMessage('Vendor name maksimal 100 karakter'),
+
+    // Initial payment validation
+    body('initial_payment')
+        .optional({ nullable: true, checkFalsy: true })
+        .isObject()
+        .withMessage('Initial payment harus berupa object'),
+
     body('initial_payment.amount')
-        .optional()
-        .isFloat({ min: 0 })
-        .withMessage('Jumlah pembayaran harus berupa angka positif'),
+        .if(body('initial_payment').exists())
+        .exists()
+        .withMessage('Payment amount wajib diisi jika initial_payment disertakan')
+        .isFloat({ min: 0.01 })
+        .withMessage('Payment amount minimal 0.01'),
+
     body('initial_payment.payment_method')
-        .optional()
+        .if(body('initial_payment').exists())
+        .exists()
+        .withMessage('Payment method wajib diisi jika initial_payment disertakan')
         .isIn(['CASH', 'TRANSFER', 'DEBIT', 'CREDIT', 'QRIS', 'OTHER'])
-        .withMessage('Metode pembayaran tidak valid'),
-    body('notes')
-        .optional()
-        .trim(),
+        .withMessage('Payment method harus salah satu dari: CASH, TRANSFER, DEBIT, CREDIT, QRIS, OTHER'),
+
+    body('initial_payment.reference_number')
+        .optional({ nullable: true, checkFalsy: true })
+        .trim()
+        .isLength({ max: 50 })
+        .withMessage('Reference number maksimal 50 karakter'),
+
+    // Business rule validations
+    body()
+        .custom((value) => {
+            // Validate that if item_type is EXTERNAL, base_price is provided
+            if (value.items && Array.isArray(value.items)) {
+                for (let i = 0; i < value.items.length; i++) {
+                    const item = value.items[i];
+                    if (item.item_type === 'EXTERNAL' && (!item.base_price || item.base_price <= 0)) {
+                        throw new Error(`Item ${i + 1} (EXTERNAL): base_price wajib diisi dan harus > 0`);
+                    }
+                    if (item.item_type === 'EXTERNAL' && (!item.item_name || item.item_name.trim() === '')) {
+                        throw new Error(`Item ${i + 1} (EXTERNAL): item_name wajib diisi`);
+                    }
+                    if (['PRODUCT', 'SERVICE', 'PACKAGE'].includes(item.item_type) && !item.item_id) {
+                        throw new Error(`Item ${i + 1} (${item.item_type}): item_id wajib diisi`);
+                    }
+                }
+            }
+            return true;
+        }),
+
+    body()
+        .custom((value) => {
+            // Validate custom_price only for SERVICE items
+            if (value.items && Array.isArray(value.items)) {
+                for (let i = 0; i < value.items.length; i++) {
+                    const item = value.items[i];
+                    if (item.custom_price !== undefined && item.item_type !== 'SERVICE') {
+                        throw new Error(`Item ${i + 1}: custom_price hanya bisa digunakan untuk SERVICE items`);
+                    }
+                }
+            }
+            return true;
+        }),
 ];
 
 // ==================== PAYMENT VALIDATORS ====================
@@ -349,6 +511,7 @@ const validateSetting = [
 ];
 
 module.exports = {
+    handleValidationErrors,
     validateLogin,
     validateRegister,
     validateChangePassword,

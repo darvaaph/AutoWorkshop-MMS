@@ -18,6 +18,68 @@ const InventoryLog = require('../models/inventory-log.model');
 const auditService = require('../services/audit.service');
 
 // ============================================
+// ERROR HANDLING HELPERS
+// ============================================
+
+/**
+ * Get detailed error message based on error type
+ */
+const getDetailedErrorMessage = (error) => {
+    // Handle Sequelize validation errors
+    if (error.name === 'SequelizeValidationError') {
+        const messages = error.errors.map(err => `${err.path}: ${err.message}`);
+        return `Validation Error: ${messages.join(', ')}`;
+    }
+
+    // Handle Sequelize unique constraint errors
+    if (error.name === 'SequelizeUniqueConstraintError') {
+        return `Duplicate entry error: ${error.errors[0]?.message || 'Unique constraint violated'}`;
+    }
+
+    // Handle Sequelize foreign key constraint errors
+    if (error.name === 'SequelizeForeignKeyConstraintError') {
+        return `Foreign key constraint error: Invalid reference in ${error.table}`;
+    }
+
+    // Handle custom business logic errors
+    if (error.message.includes('Insufficient stock')) {
+        return error.message; // Already descriptive
+    }
+
+    if (error.message.includes('not found')) {
+        return error.message; // Already descriptive
+    }
+
+    // Handle database connection errors
+    if (error.name === 'SequelizeConnectionError') {
+        return 'Database connection error. Please try again later.';
+    }
+
+    // Handle transaction rollback errors
+    if (error.message.includes('rollback')) {
+        return 'Transaction failed and was rolled back. Please check your data and try again.';
+    }
+
+    // Generic fallback
+    return error.message || 'An unexpected error occurred while processing the transaction';
+};
+
+/**
+ * Log error with context for debugging
+ */
+const logTransactionError = (error, context) => {
+    console.error('=== TRANSACTION ERROR ===');
+    console.error('Timestamp:', new Date().toISOString());
+    console.error('Error Type:', error.name || 'Unknown');
+    console.error('Error Message:', error.message);
+    console.error('Context:', context);
+    if (error.stack) {
+        console.error('Stack Trace:', error.stack);
+    }
+    console.error('=== END ERROR ===');
+};
+
+// ============================================
 // HELPER FUNCTIONS
 // ============================================
 
@@ -323,7 +385,7 @@ exports.createTransaction = async (req, res) => {
 
         const userId = req.user.id;
 
-        // Validation
+        // Validation: Check required fields
         if (!items || items.length === 0) {
             await t.rollback();
             return res.status(400).json({
@@ -359,13 +421,90 @@ exports.createTransaction = async (req, res) => {
             }
         }
 
-        // Process each item
+        // ============================================
+        // OPTIMIZATION: Bulk queries to avoid N+1 problem
+        // ============================================
+
+        // Collect all IDs by type for bulk queries
+        const productIds = new Set();
+        const serviceIds = new Set();
+        const packageIds = new Set();
+
+        for (const item of items) {
+            if (item.item_type === 'PRODUCT' && item.item_id) {
+                productIds.add(item.item_id);
+            } else if (item.item_type === 'SERVICE' && item.item_id) {
+                serviceIds.add(item.item_id);
+            } else if (item.item_type === 'PACKAGE' && item.item_id) {
+                packageIds.add(item.item_id);
+            }
+        }
+
+        // Bulk fetch all required data
+        const [products, services, packages] = await Promise.all([
+            productIds.size > 0 ? Product.findAll({
+                where: { id: Array.from(productIds) },
+                transaction: t,
+                lock: t.LOCK.UPDATE
+            }) : [],
+            serviceIds.size > 0 ? Service.findAll({
+                where: { id: Array.from(serviceIds) },
+                transaction: t
+            }) : [],
+            packageIds.size > 0 ? Package.findAll({
+                where: {
+                    id: Array.from(packageIds),
+                    is_active: true
+                },
+                include: [{
+                    model: PackageItem,
+                    as: 'items',
+                    include: [
+                        { model: Product, as: 'product' },
+                        { model: Service, as: 'service' }
+                    ]
+                }],
+                transaction: t
+            }) : []
+        ]);
+
+        // Create lookup maps for O(1) access
+        const productMap = products.reduce((map, p) => { map[p.id] = p; return map; }, {});
+        const serviceMap = services.reduce((map, s) => { map[s.id] = s; return map; }, {});
+        const packageMap = packages.reduce((map, pkg) => { map[pkg.id] = pkg; return map; }, {});
+
+        // Collect all package component product IDs for additional bulk query
+        const packageProductIds = new Set();
+        for (const pkg of packages) {
+            for (const pkgItem of pkg.items) {
+                if (pkgItem.product_id) {
+                    packageProductIds.add(pkgItem.product_id);
+                }
+            }
+        }
+
+        // Bulk fetch package component products (if any new ones)
+        const packageProducts = packageProductIds.size > 0 ?
+            await Product.findAll({
+                where: { id: Array.from(packageProductIds) },
+                transaction: t,
+                lock: t.LOCK.UPDATE
+            }) : [];
+
+        const packageProductMap = packageProducts.reduce((map, p) => { map[p.id] = p; return map; }, {});
+
+        // ============================================
+        // Process each item using cached data
+        // ============================================
+
+        // Process each item and determine prices
         const processedItems = [];
         const allComponentsToDeduct = [];
+        let subtotal = 0;
 
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
-            
+
             // Validate item structure
             if (!item.item_type) {
                 await t.rollback();
@@ -384,49 +523,123 @@ exports.createTransaction = async (req, res) => {
             }
 
             const qty = item.qty || 1;
+            let basePrice = 0;
+            let sellPrice = 0;
+            let costPrice = 0;
+            let itemName = '';
 
-            // Get item details and validate stock
-            const result = await getItemDetails(item.item_type, item.item_id, qty, t);
-
-            if (result.error) {
+            // Price determination logic using cached data
+            if (item.item_type === 'PRODUCT') {
+                const product = productMap[item.item_id];
+                if (!product) {
+                    await t.rollback();
+                    return res.status(400).json({
+                        success: false,
+                        message: `Product with ID ${item.item_id} not found`
+                    });
+                }
+                if (product.stock < qty) {
+                    await t.rollback();
+                    return res.status(400).json({
+                        success: false,
+                        message: `Insufficient stock for "${product.name}". Available: ${product.stock}, Requested: ${qty}`
+                    });
+                }
+                basePrice = parseFloat(product.price_sell); // Use database price, ignore frontend
+                sellPrice = basePrice - parseFloat(item.discount_amount || 0);
+                costPrice = parseFloat(product.price_buy);
+                itemName = product.name;
+                allComponentsToDeduct.push({
+                    product_id: product.id,
+                    product_name: product.name,
+                    qty: qty,
+                    current_stock: product.stock
+                });
+            } else if (item.item_type === 'SERVICE') {
+                const service = serviceMap[item.item_id];
+                if (!service) {
+                    await t.rollback();
+                    return res.status(400).json({
+                        success: false,
+                        message: `Service with ID ${item.item_id} not found`
+                    });
+                }
+                basePrice = item.custom_price ? parseFloat(item.custom_price) : parseFloat(service.price); // Use custom_price if provided
+                sellPrice = basePrice - parseFloat(item.discount_amount || 0);
+                costPrice = 0; // Services have no COGS
+                itemName = service.name;
+            } else if (item.item_type === 'PACKAGE') {
+                const pkg = packageMap[item.item_id];
+                if (!pkg) {
+                    await t.rollback();
+                    return res.status(400).json({
+                        success: false,
+                        message: `Package with ID ${item.item_id} not found or inactive`
+                    });
+                }
+                basePrice = parseFloat(pkg.price); // Use database price, ignore frontend
+                sellPrice = basePrice - parseFloat(item.discount_amount || 0);
+                itemName = pkg.name;
+                let totalComponentCost = 0;
+                for (const pkgItem of pkg.items) {
+                    if (pkgItem.product_id) {
+                        // Use cached package product data
+                        const product = packageProductMap[pkgItem.product_id] || pkgItem.product;
+                        if (!product || product.stock < (pkgItem.qty * qty)) {
+                            await t.rollback();
+                            return res.status(400).json({
+                                success: false,
+                                message: `Insufficient stock for package component "${product?.name || 'Unknown'}". Available: ${product?.stock || 0}, Required: ${pkgItem.qty * qty}`
+                            });
+                        }
+                        totalComponentCost += parseFloat(product.price_buy) * pkgItem.qty;
+                        allComponentsToDeduct.push({
+                            product_id: product.id,
+                            product_name: product.name,
+                            qty: pkgItem.qty * qty,
+                            current_stock: product.stock,
+                            is_package_component: true,
+                            package_name: pkg.name
+                        });
+                    }
+                }
+                costPrice = totalComponentCost * qty;
+            } else if (item.item_type === 'EXTERNAL') {
+                basePrice = parseFloat(item.base_price || 0);
+                sellPrice = basePrice - parseFloat(item.discount_amount || 0);
+                costPrice = parseFloat(item.cost_price || 0);
+                itemName = item.item_name;
+            } else {
                 await t.rollback();
                 return res.status(400).json({
                     success: false,
-                    message: result.error
+                    message: `Invalid item type: ${item.item_type}`
                 });
             }
 
-            // Build processed item
-            const processedItem = {
+            processedItems.push({
                 item_type: item.item_type,
                 item_id: item.item_id || 0,
-                item_name: item.item_type === 'EXTERNAL' ? item.item_name : result.itemData.item_name,
+                item_name: itemName,
                 qty: qty,
-                base_price: item.item_type === 'EXTERNAL' ? item.base_price : result.itemData.base_price,
+                base_price: basePrice,
                 discount_amount: parseFloat(item.discount_amount || 0),
-                sell_price: (item.item_type === 'EXTERNAL' ? item.base_price : result.itemData.base_price) - parseFloat(item.discount_amount || 0),
-                cost_price: item.item_type === 'EXTERNAL' ? (item.cost_price || 0) : result.itemData.cost_price,
-                vendor_name: item.vendor_name || null
-            };
+                sell_price: sellPrice,
+                cost_price: costPrice
+            });
 
-            processedItems.push(processedItem);
-
-            // Collect components to deduct
-            if (result.componentsToDeduct) {
-                allComponentsToDeduct.push(...result.componentsToDeduct);
-            }
+            subtotal += sellPrice * qty;
         }
 
         // Calculate totals
-        const totals = calculateTotals(processedItems, parseFloat(discount_amount));
+        const totalAmount = subtotal - parseFloat(discount_amount);
 
         // Determine initial status
         let initialStatus = 'UNPAID';
         let paidAmount = 0;
-
         if (initial_payment && initial_payment.amount > 0) {
             paidAmount = parseFloat(initial_payment.amount);
-            if (paidAmount >= totals.total_amount) {
+            if (paidAmount >= totalAmount) {
                 initialStatus = 'PAID';
             } else if (paidAmount > 0) {
                 initialStatus = 'PARTIAL';
@@ -440,9 +653,9 @@ exports.createTransaction = async (req, res) => {
             mechanic_id: mechanic_id || null,
             date: new Date(),
             status: initialStatus,
-            subtotal: totals.subtotal,
+            subtotal: subtotal,
             discount_amount: parseFloat(discount_amount),
-            total_amount: totals.total_amount,
+            total_amount: totalAmount,
             current_km: current_km || null,
             notes: notes || null
         }, { transaction: t });
@@ -452,12 +665,54 @@ exports.createTransaction = async (req, res) => {
             transaction_id: transaction.id,
             ...item
         }));
-
         await TransactionItem.bulkCreate(transactionItems, { transaction: t });
 
-        // Deduct inventory for all product components
+        // Deduct inventory for all product components (optimized - no additional queries)
         if (allComponentsToDeduct.length > 0) {
-            await deductInventory(allComponentsToDeduct, transaction.id, userId, t);
+            // Group by product_id to avoid duplicate updates
+            const productUpdates = new Map();
+
+            for (const component of allComponentsToDeduct) {
+                if (!productUpdates.has(component.product_id)) {
+                    productUpdates.set(component.product_id, {
+                        product_id: component.product_id,
+                        product_name: component.product_name,
+                        total_qty: 0,
+                        current_stock: component.current_stock,
+                        components: []
+                    });
+                }
+                const update = productUpdates.get(component.product_id);
+                update.total_qty += component.qty;
+                update.components.push(component);
+            }
+
+            // Update stock and create inventory logs for each unique product
+            for (const [productId, update] of productUpdates) {
+                const stockBefore = update.current_stock;
+                const stockAfter = stockBefore - update.total_qty;
+
+                // Update product stock
+                await Product.update(
+                    { stock: stockAfter },
+                    { where: { id: productId }, transaction: t }
+                );
+
+                // Create inventory log for each component (to maintain detailed tracking)
+                for (const component of update.components) {
+                    await InventoryLog.create({
+                        product_id: component.product_id,
+                        user_id: userId,
+                        type: 'OUT',
+                        qty: component.qty,
+                        stock_before: stockBefore,
+                        stock_after: stockAfter,
+                        reference_type: 'TRANSACTION',
+                        reference_id: `TRX-${transaction.id}`,
+                        notes: component.is_package_component ? `Out via Package "${component.package_name}" - Transaction #${transaction.id}` : `Sale - Transaction #${transaction.id}`
+                    }, { transaction: t });
+                }
+            }
         }
 
         // Create initial payment if provided
@@ -475,12 +730,7 @@ exports.createTransaction = async (req, res) => {
         // If PAID, calculate service reminder
         let serviceReminder = null;
         if (initialStatus === 'PAID' && vehicle_id) {
-            serviceReminder = await calculateNextServiceReminder(
-                vehicle_id,
-                current_km,
-                new Date(),
-                t
-            );
+            serviceReminder = await calculateNextServiceReminder(vehicle_id, current_km, new Date(), t);
         }
 
         // Commit transaction
@@ -498,10 +748,10 @@ exports.createTransaction = async (req, res) => {
         });
 
         // Audit log for transaction creation
-        await auditService.logCreate(req.user.id, 'transactions', transaction.id, {
+        await auditService.logCreate(userId, 'transactions', transaction.id, {
             vehicle_id,
             mechanic_id,
-            total_amount: totals.total_amount,
+            total_amount: totalAmount,
             status: initialStatus,
             items_count: items.length
         }, req);
@@ -513,27 +763,43 @@ exports.createTransaction = async (req, res) => {
                 transaction: completeTransaction,
                 service_reminder: serviceReminder,
                 summary: {
-                    subtotal: totals.subtotal,
+                    subtotal: subtotal,
                     discount: parseFloat(discount_amount),
-                    total: totals.total_amount,
+                    total: totalAmount,
                     paid: paidAmount,
-                    remaining: Math.max(0, totals.total_amount - paidAmount),
+                    remaining: Math.max(0, totalAmount - paidAmount),
                     status: initialStatus,
-                    estimated_profit: totals.profit
+                    estimated_profit: totalAmount - processedItems.reduce((sum, item) => sum + item.cost_price * item.qty, 0)
                 }
             }
         });
 
     } catch (error) {
-        // Only rollback if transaction hasn't been committed yet
-        if (!t.finished) {
-            await t.rollback();
+        // Ensure transaction is rolled back
+        if (t && !t.finished) {
+            try {
+                await t.rollback();
+            } catch (rollbackError) {
+                console.error('Error rolling back transaction:', rollbackError);
+            }
         }
-        console.error('Create transaction error:', error);
+
+        // Log detailed error for debugging
+        logTransactionError(error, {
+            userId: req.user?.id,
+            payload: req.body,
+            transactionStep: 'create_transaction',
+            itemCount: req.body?.items?.length || 0
+        });
+
+        // Return user-friendly error message
+        const errorMessage = getDetailedErrorMessage(error);
+
         res.status(500).json({
             success: false,
-            message: 'Error creating transaction',
-            error: error.message
+            message: 'Failed to create transaction',
+            error: errorMessage,
+            code: error.name || 'TRANSACTION_ERROR'
         });
     }
 };
