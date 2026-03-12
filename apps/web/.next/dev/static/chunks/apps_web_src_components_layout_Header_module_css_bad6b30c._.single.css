@@ -1,0 +1,90 @@
+/* [project]/apps/web/src/components/layout/Header.module.css [app-client] (css) */
+.Header-module__5Cu8Tq__header {
+  height: var(--header-height);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
+  z-index: 10;
+  box-shadow: var(--shadow-sm);
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1.5rem;
+  display: flex;
+}
+
+.Header-module__5Cu8Tq__logo {
+  align-items: center;
+  gap: .75rem;
+  display: flex;
+}
+
+.Header-module__5Cu8Tq__logoIcon {
+  background: var(--brand-primary);
+  border-radius: var(--radius-sm);
+  justify-content: center;
+  align-items: center;
+  width: 28px;
+  height: 28px;
+  display: flex;
+}
+
+.Header-module__5Cu8Tq__logoIcon:after {
+  content: "";
+  background: var(--bg-surface);
+  border-radius: 50%;
+  width: 12px;
+  height: 12px;
+}
+
+.Header-module__5Cu8Tq__logo h1 {
+  letter-spacing: -.01em;
+  font-size: 1.125rem;
+  font-weight: 700;
+  font-family: var(--font-heading);
+}
+
+.Header-module__5Cu8Tq__headerActions {
+  align-items: center;
+  gap: 1.5rem;
+  display: flex;
+}
+
+.Header-module__5Cu8Tq__themeToggle {
+  border-radius: var(--radius-sm);
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  align-items: center;
+  gap: .5rem;
+  padding: .4rem .75rem;
+  font-size: .875rem;
+  font-weight: 600;
+  transition: all .15s;
+  display: flex;
+}
+
+.Header-module__5Cu8Tq__themeToggle:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.Header-module__5Cu8Tq__userProfile {
+  align-items: center;
+  gap: .75rem;
+  font-size: .875rem;
+  font-weight: 600;
+  display: flex;
+}
+
+.Header-module__5Cu8Tq__avatar {
+  border-radius: var(--radius-full);
+  background: var(--text-primary);
+  width: 32px;
+  height: 32px;
+  color: var(--bg-surface);
+  justify-content: center;
+  align-items: center;
+  font-weight: 700;
+  display: flex;
+}
+
+/*# sourceMappingURL=apps_web_src_components_layout_Header_module_css_bad6b30c._.single.css.map*/

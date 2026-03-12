@@ -1,0 +1,22 @@
+/* [project]/apps/web/src/components/layout/MainLayout.module.css [app-client] (css) */
+.MainLayout-module___KAOka__layout {
+  flex-direction: column;
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+}
+
+.MainLayout-module___KAOka__mainContainer {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.MainLayout-module___KAOka__content {
+  background: var(--bg-color);
+  flex: 1;
+  padding: 2.5rem 2rem;
+  overflow-y: auto;
+}
+
+/*# sourceMappingURL=apps_web_src_components_layout_MainLayout_module_css_bad6b30c._.single.css.map*/

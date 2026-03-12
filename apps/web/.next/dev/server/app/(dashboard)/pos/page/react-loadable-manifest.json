@@ -1,0 +1,10 @@
+{
+  "[project]/apps/web/node_modules/@tanstack/react-query-devtools/build/modern/index.js [app-client] (ecmascript, next/dynamic entry)": {
+    "id": "[project]/apps/web/node_modules/@tanstack/react-query-devtools/build/modern/index.js [app-client] (ecmascript, next/dynamic entry)",
+    "files": [
+      "static/chunks/5bcb1_@tanstack_query-devtools_build_9e36a481._.js",
+      "static/chunks/5bcb1_@tanstack_f86a77c9._.js",
+      "static/chunks/5bcb1_@tanstack_react-query-devtools_build_modern_index_bcf6933b.js"
+    ]
+  }
+}

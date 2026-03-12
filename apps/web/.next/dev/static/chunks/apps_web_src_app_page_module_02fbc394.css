@@ -1,0 +1,142 @@
+/* [project]/apps/web/src/app/page.module.css [app-client] (css) */
+.page-module__YnyroG__dashboardHeader {
+  margin-bottom: 2rem;
+}
+
+.page-module__YnyroG__dashboardHeader h2 {
+  margin-bottom: .5rem;
+  font-size: 1.75rem;
+}
+
+.page-module__YnyroG__dashboardHeader p {
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+.page-module__YnyroG__statsGrid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  display: grid;
+}
+
+.page-module__YnyroG__statCard {
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  transition: transform .15s, box-shadow .15s;
+  display: flex;
+}
+
+.page-module__YnyroG__statCard:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--text-muted);
+  transform: translateY(-2px);
+}
+
+.page-module__YnyroG__statIcon {
+  border-radius: var(--radius-md);
+  color: #fff;
+  justify-content: center;
+  align-items: center;
+  width: 48px;
+  height: 48px;
+  font-size: 1.5rem;
+  display: flex;
+}
+
+.page-module__YnyroG__bgInfo {
+  background: var(--status-info);
+}
+
+.page-module__YnyroG__bgSuccess {
+  background: var(--status-success);
+}
+
+.page-module__YnyroG__bgWarning {
+  background: var(--status-warning);
+}
+
+.page-module__YnyroG__statCard h3 {
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-size: .875rem;
+  font-weight: 600;
+}
+
+.page-module__YnyroG__statValue {
+  font-family: var(--font-heading);
+  color: var(--text-primary);
+  letter-spacing: -.02em;
+  margin-top: .25rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.page-module__YnyroG__card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 2rem;
+}
+
+.page-module__YnyroG__card p {
+  color: var(--text-secondary);
+  margin: 1rem 0 1.5rem;
+  line-height: 1.6;
+}
+
+.page-module__YnyroG__actionButtons {
+  gap: .75rem;
+  margin-top: 1rem;
+  display: flex;
+}
+
+.page-module__YnyroG__btnPrimary, .page-module__YnyroG__btnSecondary, .page-module__YnyroG__btnDanger {
+  border-radius: var(--radius-sm);
+  padding: .625rem 1.25rem;
+  font-size: .875rem;
+  font-weight: 600;
+  transition: all .15s;
+}
+
+.page-module__YnyroG__btnPrimary {
+  background: var(--brand-primary);
+  color: #fff;
+  border: 1px solid #0000;
+}
+
+.page-module__YnyroG__btnPrimary:hover {
+  background: var(--brand-primary-hover);
+  box-shadow: 0 2px 4px #0ea5e94d;
+}
+
+.page-module__YnyroG__btnSecondary {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.page-module__YnyroG__btnSecondary:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--text-muted);
+}
+
+.page-module__YnyroG__btnDanger {
+  background: var(--status-danger);
+  color: #fff;
+  border: 1px solid #0000;
+}
+
+.page-module__YnyroG__btnDanger:hover {
+  background: #dc2626;
+  box-shadow: 0 2px 4px #ef44444d;
+}
+
+/*# sourceMappingURL=apps_web_src_app_page_module_02fbc394.css.map*/
