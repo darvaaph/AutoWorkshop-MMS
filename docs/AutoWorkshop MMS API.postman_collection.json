@@ -1,20 +1,11 @@
 {
 	"info": {
-		"_postman_id": "autoworkshop-mms-api-collection",
+		"_postman_id": "9db32f9d-35a6-4ca7-98c1-b00d3bfa8b9d",
 		"name": "AutoWorkshop MMS API",
 		"description": "Complete API Collection for AutoWorkshop Management System",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "26768790"
 	},
-	"variable": [
-		{
-			"key": "base_url",
-			"value": "http://localhost:3000/api"
-		},
-		{
-			"key": "token",
-			"value": ""
-		}
-	],
 	"item": [
 		{
 			"name": "🔐 Auth",
@@ -50,8 +41,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/auth/login",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "login"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
 						},
 						"description": "Login sebagai Admin untuk mendapatkan token JWT"
 					},
@@ -88,8 +84,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/auth/login",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "login"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
 						},
 						"description": "Login sebagai Kasir untuk mendapatkan token JWT"
 					},
@@ -115,8 +116,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/auth/register",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "register"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"register"
+							]
 						},
 						"description": "Register user baru (hanya Admin)"
 					},
@@ -134,8 +140,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/auth/me",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "me"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"me"
+							]
 						},
 						"description": "Mendapatkan info user yang sedang login"
 					},
@@ -161,8 +172,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/auth/change-password",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "change-password"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"change-password"
+							]
 						}
 					},
 					"response": []
@@ -179,8 +195,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/auth/logout",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "logout"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"logout"
+							]
 						}
 					},
 					"response": []
@@ -202,14 +223,36 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/products?page=1&limit=20",
-							"host": ["{{base_url}}"],
-							"path": ["products"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products"
+							],
 							"query": [
-								{"key": "page", "value": "1"},
-								{"key": "limit", "value": "20"},
-								{"key": "search", "value": "", "disabled": true},
-								{"key": "category", "value": "", "disabled": true},
-								{"key": "low_stock", "value": "true", "disabled": true}
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "search",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "category",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "low_stock",
+									"value": "true",
+									"disabled": true
+								}
 							]
 						}
 					},
@@ -227,8 +270,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/products/1",
-							"host": ["{{base_url}}"],
-							"path": ["products", "1"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products",
+								"1"
+							]
 						}
 					},
 					"response": []
@@ -245,8 +293,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/products/low-stock",
-							"host": ["{{base_url}}"],
-							"path": ["products", "low-stock"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products",
+								"low-stock"
+							]
 						}
 					},
 					"response": []
@@ -266,13 +319,58 @@
 							}
 						],
 						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"sku\": \"OLI-PERTAMINA-PRIMA-4L\",\n    \"name\": \"Oli Pertamina Prima XP 10W-40 (4 Liter)\",\n    \"category\": \"Oli Mesin\",\n    \"image_url\": \"/images/products/pertamina-prima.jpg\",\n    \"price_buy\": 180000,\n    \"price_sell\": 280000,\n    \"stock\": 15,\n    \"min_stock_alert\": 5\n}"
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "sku",
+									"value": "TESTING-001",
+									"type": "text"
+								},
+								{
+									"key": "name",
+									"value": "ngetest aja",
+									"type": "text"
+								},
+								{
+									"key": "category",
+									"value": "oli mesin",
+									"type": "text"
+								},
+								{
+									"key": "price_buy",
+									"value": "150000",
+									"type": "text"
+								},
+								{
+									"key": "price_sell",
+									"value": "200000",
+									"type": "text"
+								},
+								{
+									"key": "stock",
+									"value": "90",
+									"type": "text"
+								},
+								{
+									"key": "min_stock_alert",
+									"value": "100",
+									"type": "text"
+								},
+								{
+									"key": "image",
+									"type": "file",
+									"src": "/home/darvaaph/Downloads/Background Zoom Open House MPA HIMAKOM.png"
+								}
+							]
 						},
 						"url": {
 							"raw": "{{base_url}}/products",
-							"host": ["{{base_url}}"],
-							"path": ["products"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products"
+							]
 						}
 					},
 					"response": []
@@ -297,8 +395,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/products/1",
-							"host": ["{{base_url}}"],
-							"path": ["products", "1"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products",
+								"1"
+							]
 						}
 					},
 					"response": []
@@ -315,8 +418,53 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/products/99",
-							"host": ["{{base_url}}"],
-							"path": ["products", "99"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products",
+								"99"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Image Product Specific",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "image",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/products/:id/upload-image",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products",
+								":id",
+								"upload-image"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "35"
+								}
+							]
 						}
 					},
 					"response": []
@@ -338,12 +486,26 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/services?page=1&limit=20",
-							"host": ["{{base_url}}"],
-							"path": ["services"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"services"
+							],
 							"query": [
-								{"key": "page", "value": "1"},
-								{"key": "limit", "value": "20"},
-								{"key": "search", "value": "", "disabled": true}
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "search",
+									"value": "",
+									"disabled": true
+								}
 							]
 						}
 					},
@@ -361,8 +523,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/services/1",
-							"host": ["{{base_url}}"],
-							"path": ["services", "1"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"services",
+								"1"
+							]
 						}
 					},
 					"response": []
@@ -382,13 +549,34 @@
 							}
 						],
 						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Jasa Cuci Mesin\",\n    \"price\": 75000\n}"
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "name",
+									"value": "Jasa Upload IMage",
+									"type": "text"
+								},
+								{
+									"key": "price",
+									"value": "930030",
+									"type": "text"
+								},
+								{
+									"key": "image",
+									"type": "file",
+									"src": "/home/darvaaph/Downloads/Background Zoom Open House MPA HIMAKOM.png",
+									"disabled": true
+								}
+							]
 						},
 						"url": {
 							"raw": "{{base_url}}/services",
-							"host": ["{{base_url}}"],
-							"path": ["services"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"services"
+							]
 						}
 					},
 					"response": []
@@ -413,8 +601,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/services/1",
-							"host": ["{{base_url}}"],
-							"path": ["services", "1"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"services",
+								"1"
+							]
 						}
 					},
 					"response": []
@@ -431,8 +624,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/services/99",
-							"host": ["{{base_url}}"],
-							"path": ["services", "99"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"services",
+								"99"
+							]
 						}
 					},
 					"response": []
@@ -454,13 +652,30 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/packages?page=1&limit=20&active_only=true",
-							"host": ["{{base_url}}"],
-							"path": ["packages"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"packages"
+							],
 							"query": [
-								{"key": "page", "value": "1"},
-								{"key": "limit", "value": "20"},
-								{"key": "active_only", "value": "true"},
-								{"key": "search", "value": "", "disabled": true}
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "active_only",
+									"value": "true"
+								},
+								{
+									"key": "search",
+									"value": "",
+									"disabled": true
+								}
 							]
 						}
 					},
@@ -477,9 +692,14 @@
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/packages/1",
-							"host": ["{{base_url}}"],
-							"path": ["packages", "1"]
+							"raw": "{{base_url}}/packages/10",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"packages",
+								"10"
+							]
 						}
 					},
 					"response": []
@@ -496,10 +716,19 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/packages/1/check-availability?qty=2",
-							"host": ["{{base_url}}"],
-							"path": ["packages", "1", "check-availability"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"packages",
+								"1",
+								"check-availability"
+							],
 							"query": [
-								{"key": "qty", "value": "2"}
+								{
+									"key": "qty",
+									"value": "2"
+								}
 							]
 						}
 					},
@@ -520,13 +749,92 @@
 							}
 						],
 						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Paket Service AC Hemat\",\n    \"price\": 350000,\n    \"description\": \"Paket service AC termasuk cuci evaporator dan isi freon\",\n    \"is_active\": true,\n    \"items\": [\n        {\n            \"product_id\": 8,\n            \"qty\": 2\n        },\n        {\n            \"service_id\": 6,\n            \"qty\": 1\n        }\n    ]\n}"
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "name",
+									"value": "Paket Service Komplit Avanza",
+									"type": "text"
+								},
+								{
+									"key": "price",
+									"value": "750000",
+									"type": "text"
+								},
+								{
+									"key": "description",
+									"value": "Paket service lengkap untuk Toyota Avanza termasuk ganti oli, filter, dan tune up",
+									"type": "text"
+								},
+								{
+									"key": "is_active",
+									"value": "true",
+									"type": "text"
+								},
+								{
+									"key": "item",
+									"value": "{\"product_id\":26,\"qty\":1},{\"product_id\":2,\"qty\":1},{\"service_id\":6,\"qty\":1}",
+									"type": "text"
+								},
+								{
+									"key": "image",
+									"type": "file",
+									"src": "/home/darvaaph/Downloads/download.png"
+								}
+							]
 						},
 						"url": {
 							"raw": "{{base_url}}/packages",
-							"host": ["{{base_url}}"],
-							"path": ["packages"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"packages"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Image Packages Specific",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "image",
+									"type": "file",
+									"src": "/home/darvaaph/Downloads/download.png"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/packages/:id/upload-image",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"packages",
+								":id",
+								"upload-image"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "10"
+								}
+							]
 						}
 					},
 					"response": []
@@ -551,8 +859,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/packages/1",
-							"host": ["{{base_url}}"],
-							"path": ["packages", "1"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"packages",
+								"1"
+							]
 						}
 					},
 					"response": []
@@ -569,8 +882,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/packages/99",
-							"host": ["{{base_url}}"],
-							"path": ["packages", "99"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"packages",
+								"99"
+							]
 						}
 					},
 					"response": []
@@ -592,12 +910,26 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/customers?page=1&limit=20",
-							"host": ["{{base_url}}"],
-							"path": ["customers"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"customers"
+							],
 							"query": [
-								{"key": "page", "value": "1"},
-								{"key": "limit", "value": "20"},
-								{"key": "search", "value": "", "disabled": true}
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "search",
+									"value": "",
+									"disabled": true
+								}
 							]
 						}
 					},
@@ -615,8 +947,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/customers/1",
-							"host": ["{{base_url}}"],
-							"path": ["customers", "1"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"customers",
+								"1"
+							]
 						}
 					},
 					"response": []
@@ -641,8 +978,12 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/customers",
-							"host": ["{{base_url}}"],
-							"path": ["customers"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"customers"
+							]
 						}
 					},
 					"response": []
@@ -663,12 +1004,17 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Pak Bambang S.\",\n    \"address\": \"Jl. Melati Indah No. 25, Bekasi Selatan\"\n}"
+							"raw": "{\n    \"name\": \"Pak SUli S.\",\n    \"phone\": \"08122123\",\n    \"address\": \"Jl. Melati Indah No. 25, Bekasi Selatan\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/customers/1",
-							"host": ["{{base_url}}"],
-							"path": ["customers", "1"]
+							"raw": "{{base_url}}/customers/26",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"customers",
+								"26"
+							]
 						}
 					},
 					"response": []
@@ -685,8 +1031,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/customers/99",
-							"host": ["{{base_url}}"],
-							"path": ["customers", "99"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"customers",
+								"99"
+							]
 						}
 					},
 					"response": []
@@ -708,13 +1059,31 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/vehicles?page=1&limit=20",
-							"host": ["{{base_url}}"],
-							"path": ["vehicles"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"vehicles"
+							],
 							"query": [
-								{"key": "page", "value": "1"},
-								{"key": "limit", "value": "20"},
-								{"key": "search", "value": "", "disabled": true},
-								{"key": "customer_id", "value": "", "disabled": true}
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "search",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "customer_id",
+									"value": "",
+									"disabled": true
+								}
 							]
 						}
 					},
@@ -732,8 +1101,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/vehicles/1",
-							"host": ["{{base_url}}"],
-							"path": ["vehicles", "1"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"vehicles",
+								"1"
+							]
 						}
 					},
 					"response": []
@@ -753,13 +1127,78 @@
 							}
 						],
 						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "customer_id",
+									"value": "",
+									"type": "text"
+								},
+								{
+									"key": "license_plate",
+									"value": "",
+									"type": "text"
+								},
+								{
+									"key": "brand",
+									"value": "",
+									"type": "text"
+								},
+								{
+									"key": "model",
+									"value": "",
+									"type": "text"
+								},
+								{
+									"key": "current_km",
+									"value": "",
+									"type": "text"
+								},
+								{
+									"key": "image",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/vehicles",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"vehicles"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Image Vehicles Spesific",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
 							"mode": "raw",
 							"raw": "{\n    \"customer_id\": 1,\n    \"license_plate\": \"B 5678 ZZ\",\n    \"brand\": \"Daihatsu\",\n    \"model\": \"Sigra 1.2 R Deluxe MT 2022\",\n    \"current_km\": 12000\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/vehicles",
-							"host": ["{{base_url}}"],
-							"path": ["vehicles"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"vehicles"
+							]
 						}
 					},
 					"response": []
@@ -784,8 +1223,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/vehicles/1",
-							"host": ["{{base_url}}"],
-							"path": ["vehicles", "1"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"vehicles",
+								"1"
+							]
 						}
 					},
 					"response": []
@@ -802,8 +1246,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/vehicles/99",
-							"host": ["{{base_url}}"],
-							"path": ["vehicles", "99"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"vehicles",
+								"99"
+							]
 						}
 					},
 					"response": []
@@ -820,8 +1269,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/vehicles/due-service",
-							"host": ["{{base_url}}"],
-							"path": ["vehicles", "due-service"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"vehicles",
+								"due-service"
+							]
 						},
 						"description": "Mendapatkan daftar kendaraan yang perlu service dalam 7 hari ke depan atau sudah overdue"
 					},
@@ -847,8 +1301,14 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/vehicles/1/mark-contacted",
-							"host": ["{{base_url}}"],
-							"path": ["vehicles", "1", "mark-contacted"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"vehicles",
+								"1",
+								"mark-contacted"
+							]
 						},
 						"description": "Tandai kendaraan bahwa pelanggan sudah dihubungi untuk reminder service"
 					},
@@ -866,8 +1326,14 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/vehicles/1/reset-reminder",
-							"host": ["{{base_url}}"],
-							"path": ["vehicles", "1", "reset-reminder"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"vehicles",
+								"1",
+								"reset-reminder"
+							]
 						},
 						"description": "Reset status reminder kendaraan (biasanya otomatis saat transaksi baru)"
 					},
@@ -890,12 +1356,64 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/mechanics?page=1&limit=20",
-							"host": ["{{base_url}}"],
-							"path": ["mechanics"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"mechanics"
+							],
 							"query": [
-								{"key": "page", "value": "1"},
-								{"key": "limit", "value": "20"},
-								{"key": "is_active", "value": "true", "disabled": true}
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "is_active",
+									"value": "true",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Mechanics Details (Admin Only)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/mechanics/:id/details",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"mechanics",
+								":id",
+								"details"
+							],
+							"query": [
+								{
+									"key": "is_active",
+									"value": "true",
+									"disabled": true
+								}
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
 							]
 						}
 					},
@@ -913,8 +1431,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/mechanics/1",
-							"host": ["{{base_url}}"],
-							"path": ["mechanics", "1"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"mechanics",
+								"1"
+							]
 						}
 					},
 					"response": []
@@ -939,8 +1462,42 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/mechanics",
-							"host": ["{{base_url}}"],
-							"path": ["mechanics"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"mechanics"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Photo Mechanic Specific",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Dedi Kurniawan\",\n    \"is_active\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/mechanics",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"mechanics"
+							]
 						}
 					},
 					"response": []
@@ -965,8 +1522,44 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/mechanics/1",
-							"host": ["{{base_url}}"],
-							"path": ["mechanics", "1"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"mechanics",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Mechanic Details (Admin Only)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"is_active\": false\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/mechanics/1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"mechanics",
+								"1"
+							]
 						}
 					},
 					"response": []
@@ -983,8 +1576,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/mechanics/99",
-							"host": ["{{base_url}}"],
-							"path": ["mechanics", "99"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"mechanics",
+								"99"
+							]
 						}
 					},
 					"response": []
@@ -1014,8 +1612,12 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/transactions",
-							"host": ["{{base_url}}"],
-							"path": ["transactions"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"transactions"
+							]
 						},
 						"description": "Buat transaksi dengan pembayaran lunas langsung. Status akan jadi PAID dan service reminder akan dihitung."
 					},
@@ -1041,8 +1643,12 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/transactions",
-							"host": ["{{base_url}}"],
-							"path": ["transactions"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"transactions"
+							]
 						},
 						"description": "Buat transaksi dengan pembayaran sebagian (DP). Status akan jadi PARTIAL."
 					},
@@ -1068,8 +1674,12 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/transactions",
-							"host": ["{{base_url}}"],
-							"path": ["transactions"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"transactions"
+							]
 						},
 						"description": "Buat transaksi untuk pembelian langsung tanpa kendaraan (walk-in customer)."
 					},
@@ -1095,8 +1705,12 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/transactions",
-							"host": ["{{base_url}}"],
-							"path": ["transactions"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"transactions"
+							]
 						},
 						"description": "Buat transaksi dengan external service (vendor luar)."
 					},
@@ -1114,18 +1728,56 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/transactions?page=1&limit=20",
-							"host": ["{{base_url}}"],
-							"path": ["transactions"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"transactions"
+							],
 							"query": [
-								{"key": "page", "value": "1"},
-								{"key": "limit", "value": "20"},
-								{"key": "status", "value": "PAID", "disabled": true},
-								{"key": "vehicle_id", "value": "1", "disabled": true},
-								{"key": "mechanic_id", "value": "1", "disabled": true},
-								{"key": "date_from", "value": "2024-01-01", "disabled": true},
-								{"key": "date_to", "value": "2024-12-31", "disabled": true},
-								{"key": "sort_by", "value": "date", "disabled": true},
-								{"key": "sort_order", "value": "DESC", "disabled": true}
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "status",
+									"value": "PAID",
+									"disabled": true
+								},
+								{
+									"key": "vehicle_id",
+									"value": "1",
+									"disabled": true
+								},
+								{
+									"key": "mechanic_id",
+									"value": "1",
+									"disabled": true
+								},
+								{
+									"key": "date_from",
+									"value": "2024-01-01",
+									"disabled": true
+								},
+								{
+									"key": "date_to",
+									"value": "2024-12-31",
+									"disabled": true
+								},
+								{
+									"key": "sort_by",
+									"value": "date",
+									"disabled": true
+								},
+								{
+									"key": "sort_order",
+									"value": "DESC",
+									"disabled": true
+								}
 							]
 						}
 					},
@@ -1143,8 +1795,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/transactions/1",
-							"host": ["{{base_url}}"],
-							"path": ["transactions", "1"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"transactions",
+								"1"
+							]
 						}
 					},
 					"response": []
@@ -1161,10 +1818,19 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/transactions/1/print?type=receipt",
-							"host": ["{{base_url}}"],
-							"path": ["transactions", "1", "print"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"transactions",
+								"1",
+								"print"
+							],
 							"query": [
-								{"key": "type", "value": "receipt"}
+								{
+									"key": "type",
+									"value": "receipt"
+								}
 							]
 						},
 						"description": "Get transaction data formatted for receipt printing. Shows package names only."
@@ -1183,10 +1849,19 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/transactions/1/print?type=work_order",
-							"host": ["{{base_url}}"],
-							"path": ["transactions", "1", "print"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"transactions",
+								"1",
+								"print"
+							],
 							"query": [
-								{"key": "type", "value": "work_order"}
+								{
+									"key": "type",
+									"value": "work_order"
+								}
 							]
 						},
 						"description": "Get transaction data formatted for work order. Shows exploded package items."
@@ -1213,8 +1888,14 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/transactions/8/pay",
-							"host": ["{{base_url}}"],
-							"path": ["transactions", "8", "pay"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"transactions",
+								"8",
+								"pay"
+							]
 						},
 						"description": "Tambah pembayaran ke transaksi. Jika lunas, status berubah ke PAID dan service reminder dihitung."
 					},
@@ -1240,8 +1921,14 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/transactions/99/cancel",
-							"host": ["{{base_url}}"],
-							"path": ["transactions", "99", "cancel"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"transactions",
+								"99",
+								"cancel"
+							]
 						},
 						"description": "Batalkan transaksi. Stok akan dikembalikan. Hanya ADMIN yang bisa cancel."
 					},
@@ -1264,15 +1951,41 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/payments?page=1&limit=20",
-							"host": ["{{base_url}}"],
-							"path": ["payments"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"payments"
+							],
 							"query": [
-								{"key": "page", "value": "1"},
-								{"key": "limit", "value": "20"},
-								{"key": "transaction_id", "value": "1", "disabled": true},
-								{"key": "payment_method", "value": "CASH", "disabled": true},
-								{"key": "date_from", "value": "2024-01-01", "disabled": true},
-								{"key": "date_to", "value": "2024-12-31", "disabled": true}
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "transaction_id",
+									"value": "1",
+									"disabled": true
+								},
+								{
+									"key": "payment_method",
+									"value": "CASH",
+									"disabled": true
+								},
+								{
+									"key": "date_from",
+									"value": "2024-01-01",
+									"disabled": true
+								},
+								{
+									"key": "date_to",
+									"value": "2024-12-31",
+									"disabled": true
+								}
 							]
 						}
 					},
@@ -1290,8 +2003,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/payments/1",
-							"host": ["{{base_url}}"],
-							"path": ["payments", "1"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"payments",
+								"1"
+							]
 						}
 					},
 					"response": []
@@ -1313,15 +2031,41 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/inventory?page=1&limit=20",
-							"host": ["{{base_url}}"],
-							"path": ["inventory"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"inventory"
+							],
 							"query": [
-								{"key": "page", "value": "1"},
-								{"key": "limit", "value": "20"},
-								{"key": "product_id", "value": "1", "disabled": true},
-								{"key": "type", "value": "IN", "disabled": true},
-								{"key": "date_from", "value": "2024-01-01", "disabled": true},
-								{"key": "date_to", "value": "2024-12-31", "disabled": true}
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "product_id",
+									"value": "1",
+									"disabled": true
+								},
+								{
+									"key": "type",
+									"value": "IN",
+									"disabled": true
+								},
+								{
+									"key": "date_from",
+									"value": "2024-01-01",
+									"disabled": true
+								},
+								{
+									"key": "date_to",
+									"value": "2024-12-31",
+									"disabled": true
+								}
 							]
 						}
 					},
@@ -1347,8 +2091,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/inventory/in",
-							"host": ["{{base_url}}"],
-							"path": ["inventory", "in"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"inventory",
+								"in"
+							]
 						},
 						"description": "Tambah stok barang masuk dengan perhitungan HPP Moving Average"
 					},
@@ -1374,8 +2123,12 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/inventory",
-							"host": ["{{base_url}}"],
-							"path": ["inventory"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"inventory"
+							]
 						},
 						"description": "Manual inventory log entry (IN/OUT/ADJUSTMENT)"
 					},
@@ -1401,8 +2154,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/inventory/stock-audit",
-							"host": ["{{base_url}}"],
-							"path": ["inventory", "stock-audit"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"inventory",
+								"stock-audit"
+							]
 						},
 						"description": "Penyesuaian stok berdasarkan hasil stock opname (tidak mempengaruhi laporan penjualan)"
 					},
@@ -1428,8 +2186,14 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/inventory/stock-audit/bulk",
-							"host": ["{{base_url}}"],
-							"path": ["inventory", "stock-audit", "bulk"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"inventory",
+								"stock-audit",
+								"bulk"
+							]
 						},
 						"description": "Stock opname untuk banyak produk sekaligus"
 					},
@@ -1447,14 +2211,38 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/inventory/stock-audit/history?page=1&limit=20",
-							"host": ["{{base_url}}"],
-							"path": ["inventory", "stock-audit", "history"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"inventory",
+								"stock-audit",
+								"history"
+							],
 							"query": [
-								{"key": "page", "value": "1"},
-								{"key": "limit", "value": "20"},
-								{"key": "product_id", "value": "", "disabled": true},
-								{"key": "date_from", "value": "", "disabled": true},
-								{"key": "date_to", "value": "", "disabled": true}
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "product_id",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "date_from",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "date_to",
+									"value": "",
+									"disabled": true
+								}
 							]
 						},
 						"description": "Riwayat stock audit/opname"
@@ -1473,11 +2261,25 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/inventory/stock-audit/report",
-							"host": ["{{base_url}}"],
-							"path": ["inventory", "stock-audit", "report"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"inventory",
+								"stock-audit",
+								"report"
+							],
 							"query": [
-								{"key": "date_from", "value": "", "disabled": true},
-								{"key": "date_to", "value": "", "disabled": true}
+								{
+									"key": "date_from",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "date_to",
+									"value": "",
+									"disabled": true
+								}
 							]
 						},
 						"description": "Laporan selisih stok dari hasil audit"
@@ -1501,14 +2303,36 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/expenses?page=1&limit=20",
-							"host": ["{{base_url}}"],
-							"path": ["expenses"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"expenses"
+							],
 							"query": [
-								{"key": "page", "value": "1"},
-								{"key": "limit", "value": "20"},
-								{"key": "category", "value": "", "disabled": true},
-								{"key": "date_from", "value": "2024-01-01", "disabled": true},
-								{"key": "date_to", "value": "2024-12-31", "disabled": true}
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "category",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "date_from",
+									"value": "2024-01-01",
+									"disabled": true
+								},
+								{
+									"key": "date_to",
+									"value": "2024-12-31",
+									"disabled": true
+								}
 							]
 						}
 					},
@@ -1526,8 +2350,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/expenses/1",
-							"host": ["{{base_url}}"],
-							"path": ["expenses", "1"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"expenses",
+								"1"
+							]
 						}
 					},
 					"response": []
@@ -1552,8 +2381,12 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/expenses",
-							"host": ["{{base_url}}"],
-							"path": ["expenses"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"expenses"
+							]
 						}
 					},
 					"response": []
@@ -1578,8 +2411,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/expenses/1",
-							"host": ["{{base_url}}"],
-							"path": ["expenses", "1"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"expenses",
+								"1"
+							]
 						}
 					},
 					"response": []
@@ -1596,8 +2434,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/expenses/99",
-							"host": ["{{base_url}}"],
-							"path": ["expenses", "99"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"expenses",
+								"99"
+							]
 						}
 					},
 					"response": []
@@ -1619,8 +2462,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/reports/dashboard",
-							"host": ["{{base_url}}"],
-							"path": ["reports", "dashboard"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"reports",
+								"dashboard"
+							]
 						}
 					},
 					"response": []
@@ -1637,11 +2485,22 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/reports/financial?date_from=2024-01-01&date_to=2024-01-31",
-							"host": ["{{base_url}}"],
-							"path": ["reports", "financial"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"reports",
+								"financial"
+							],
 							"query": [
-								{"key": "date_from", "value": "2024-01-01"},
-								{"key": "date_to", "value": "2024-01-31"}
+								{
+									"key": "date_from",
+									"value": "2024-01-01"
+								},
+								{
+									"key": "date_to",
+									"value": "2024-01-31"
+								}
 							]
 						}
 					},
@@ -1659,8 +2518,13 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/reports/inventory",
-							"host": ["{{base_url}}"],
-							"path": ["reports", "inventory"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"reports",
+								"inventory"
+							]
 						}
 					},
 					"response": []
@@ -1677,12 +2541,26 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/reports/sales?date_from=2024-01-01&date_to=2024-01-31&group_by=day",
-							"host": ["{{base_url}}"],
-							"path": ["reports", "sales"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"reports",
+								"sales"
+							],
 							"query": [
-								{"key": "date_from", "value": "2024-01-01"},
-								{"key": "date_to", "value": "2024-01-31"},
-								{"key": "group_by", "value": "day"}
+								{
+									"key": "date_from",
+									"value": "2024-01-01"
+								},
+								{
+									"key": "date_to",
+									"value": "2024-01-31"
+								},
+								{
+									"key": "group_by",
+									"value": "day"
+								}
 							]
 						}
 					},
@@ -1705,8 +2583,45 @@
 						],
 						"url": {
 							"raw": "{{base_url}}/settings",
-							"host": ["{{base_url}}"],
-							"path": ["settings"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"settings"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Logo",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "logo",
+									"type": "file",
+									"src": "/home/darvaaph/Downloads/download.png"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/settings/upload-logo",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"settings",
+								"upload-logo"
+							]
 						}
 					},
 					"response": []
@@ -1731,13 +2646,27 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/settings",
-							"host": ["{{base_url}}"],
-							"path": ["settings"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"settings"
+							]
 						}
 					},
 					"response": []
 				}
 			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
 		}
 	]
 }
