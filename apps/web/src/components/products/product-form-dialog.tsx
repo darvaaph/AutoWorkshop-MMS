@@ -45,6 +45,7 @@ interface ProductFormDialogProps {
   onOpenChange: (open: boolean) => void;
   product: Product | null;
   categories: string[];
+  canManage?: boolean;
 }
 
 const DEFAULT_CATEGORIES = [
@@ -65,6 +66,7 @@ export function ProductFormDialog({
   onOpenChange,
   product,
   categories,
+  canManage = true,
 }: ProductFormDialogProps) {
   const queryClient = useQueryClient();
   const isEditing = !!product;
@@ -120,7 +122,9 @@ export function ProductFormDialog({
       formData.append("category", customCategory || category);
       formData.append("price_buy", priceBuy);
       formData.append("price_sell", priceSell);
-      formData.append("stock", stock);
+      if (!isEditing) {
+        formData.append("stock", stock);
+      }
       formData.append("min_stock_alert", minStockAlert);
       if (imageFile) formData.append("image", imageFile);
 
@@ -171,11 +175,42 @@ export function ProductFormDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) {
+      toast.error("Hanya admin yang bisa mengubah data produk");
+      return;
+    }
+
     const finalCategory = customCategory || category;
     if (!sku.trim() || !name.trim() || !finalCategory || !priceBuy || !priceSell) {
       toast.error("SKU, nama, kategori, harga beli, dan harga jual wajib diisi");
       return;
     }
+
+    const parsedPriceBuy = Number(priceBuy);
+    const parsedPriceSell = Number(priceSell);
+    const parsedStock = Number(stock);
+    const parsedMinStock = Number(minStockAlert);
+
+    if (Number.isNaN(parsedPriceBuy) || Number.isNaN(parsedPriceSell)) {
+      toast.error("Harga beli dan harga jual harus berupa angka");
+      return;
+    }
+
+    if (parsedPriceBuy < 0 || parsedPriceSell < 0) {
+      toast.error("Harga tidak boleh bernilai negatif");
+      return;
+    }
+
+    if (!isEditing && (Number.isNaN(parsedStock) || parsedStock < 0)) {
+      toast.error("Stok awal harus berupa angka 0 atau lebih");
+      return;
+    }
+
+    if (Number.isNaN(parsedMinStock) || parsedMinStock < 0) {
+      toast.error("Min. stok alert harus berupa angka 0 atau lebih");
+      return;
+    }
+
     mutation.mutate();
   };
 
@@ -328,17 +363,19 @@ export function ProductFormDialog({
 
           {/* Stock */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="stock">Stok</Label>
-              <Input
-                id="stock"
-                type="number"
-                value={stock}
-                onChange={(e) => setStock(e.target.value)}
-                placeholder="0"
-                min="0"
-              />
-            </div>
+            {!isEditing && (
+              <div className="space-y-2">
+                <Label htmlFor="stock">Stok Awal</Label>
+                <Input
+                  id="stock"
+                  type="number"
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
+                  placeholder="0"
+                  min="0"
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="min-stock">Min. Stok Alert</Label>
               <Input
@@ -350,11 +387,22 @@ export function ProductFormDialog({
                 min="0"
               />
             </div>
+            {isEditing && (
+              <p className="col-span-2 text-xs text-muted-foreground">
+                Stok tidak diubah dari form ini. Gunakan menu Inventori untuk Stock In atau Stock Audit.
+              </p>
+            )}
           </div>
 
           {/* Margin info */}
           {priceBuy && priceSell && (
-            <div className="rounded-lg bg-muted/50 p-3 text-sm">
+            <div
+              className={`rounded-lg p-3 text-sm ${
+                Number(priceSell) < Number(priceBuy)
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-muted/50"
+              }`}
+            >
               <p className="font-medium">Info Margin</p>
               <p className="text-muted-foreground mt-1">
                 Margin: Rp {(Number(priceSell) - Number(priceBuy)).toLocaleString("id-ID")}
@@ -364,6 +412,11 @@ export function ProductFormDialog({
                   </span>
                 )}
               </p>
+              {Number(priceSell) < Number(priceBuy) && (
+                <p className="mt-1 text-xs">
+                  Harga jual di bawah harga beli (potensi rugi).
+                </p>
+              )}
             </div>
           )}
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productsApi } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth-store";
 import { formatCurrency, getUploadUrl, getInitials } from "@/lib/utils";
 import { toast } from "sonner";
 import { AxiosError } from "axios";
@@ -86,6 +87,8 @@ interface ProductsResponse {
 
 export default function ProductsPage() {
   const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
+  const canManageProducts = user?.role === "ADMIN";
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [page, setPage] = useState(1);
@@ -121,11 +124,19 @@ export default function ProductsPage() {
   });
 
   const handleEdit = (product: Product) => {
+    if (!canManageProducts) {
+      toast.error("Hanya admin yang bisa mengubah produk");
+      return;
+    }
     setEditingProduct(product);
     setFormOpen(true);
   };
 
   const handleCreate = () => {
+    if (!canManageProducts) {
+      toast.error("Hanya admin yang bisa menambah produk");
+      return;
+    }
     setEditingProduct(null);
     setFormOpen(true);
   };
@@ -146,10 +157,12 @@ export default function ProductsPage() {
             Kelola data produk dan stok bengkel
           </p>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="size-4" />
-          Tambah Produk
-        </Button>
+        {canManageProducts && (
+          <Button onClick={handleCreate}>
+            <Plus className="size-4" />
+            Tambah Produk
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -214,7 +227,7 @@ export default function ProductsPage() {
                   ? "Tidak ada produk yang cocok dengan filter"
                   : "Mulai tambahkan produk pertama Anda"}
               </p>
-              {!search && category === "all" && (
+              {canManageProducts && !search && category === "all" && (
                 <Button className="mt-4" onClick={handleCreate}>
                   <Plus className="size-4" />
                   Tambah Produk
@@ -232,7 +245,7 @@ export default function ProductsPage() {
                     <TableHead className="text-right hidden sm:table-cell">Harga Beli</TableHead>
                     <TableHead className="text-right">Harga Jual</TableHead>
                     <TableHead className="text-center">Stok</TableHead>
-                    <TableHead className="w-12"></TableHead>
+                    {canManageProducts && <TableHead className="w-12"></TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -283,28 +296,30 @@ export default function ProductsPage() {
                           </Badge>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="size-8">
-                              <MoreHorizontal className="size-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEdit(product)}>
-                              <Pencil className="size-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              variant="destructive"
-                              onClick={() => setDeleteTarget(product)}
-                            >
-                              <Trash2 className="size-4" />
-                              Hapus
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+                      {canManageProducts && (
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="size-8">
+                                <MoreHorizontal className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEdit(product)}>
+                                <Pencil className="size-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => setDeleteTarget(product)}
+                              >
+                                <Trash2 className="size-4" />
+                                Hapus
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -347,6 +362,7 @@ export default function ProductsPage() {
         onOpenChange={setFormOpen}
         product={editingProduct}
         categories={categories}
+        canManage={canManageProducts}
       />
 
       {/* Delete Confirmation */}
@@ -357,7 +373,7 @@ export default function ProductsPage() {
             <AlertDialogDescription>
               Anda yakin ingin menghapus produk{" "}
               <strong>{deleteTarget?.name}</strong> ({deleteTarget?.sku})?
-              Tindakan ini tidak dapat dibatalkan.
+              Produk yang dihapus bisa membuat paket terkait tidak bisa dijual.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -23,14 +23,25 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor — handle 401
+// Response interceptor — handle 401 & 403
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
+  (error: AxiosError<{ message?: string }>) => {
     if (error.response?.status === 401) {
       if (typeof window !== "undefined") {
+        const msg = error.response.data?.message || "";
         localStorage.removeItem("token");
         localStorage.removeItem("user");
+
+        // Store message so login page can display it
+        if (msg.includes("tidak aktif") || msg.includes("not active")) {
+          sessionStorage.setItem("auth_error", "Akun Anda telah dinonaktifkan. Hubungi admin.");
+        } else if (msg.includes("kadaluarsa") || msg.includes("expired")) {
+          sessionStorage.setItem("auth_error", "Sesi Anda telah berakhir. Silakan login kembali.");
+        } else if (msg.includes("tidak valid") || msg.includes("invalid") || msg.includes("blacklist")) {
+          sessionStorage.setItem("auth_error", "Sesi tidak valid. Silakan login kembali.");
+        }
+
         window.location.href = "/login";
       }
     }
