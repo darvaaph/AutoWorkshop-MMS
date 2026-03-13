@@ -53,6 +53,12 @@
       "namedRegex": "^/login(?:/)?$"
     },
     {
+      "page": "/products",
+      "regex": "^/products(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/products(?:/)?$"
+    },
+    {
       "page": "/vehicles",
       "regex": "^/vehicles(?:/)?$",
       "routeKeys": {},

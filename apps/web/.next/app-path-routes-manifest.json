@@ -2,6 +2,7 @@
   "/(auth)/login/page": "/login",
   "/(dashboard)/customers/page": "/customers",
   "/(dashboard)/page": "/",
+  "/(dashboard)/products/page": "/products",
   "/(dashboard)/vehicles/page": "/vehicles",
   "/_global-error/page": "/_global-error",
   "/_not-found/page": "/_not-found"
