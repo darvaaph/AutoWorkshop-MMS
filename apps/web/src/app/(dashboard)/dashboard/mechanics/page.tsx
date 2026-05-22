@@ -19,7 +19,6 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -32,7 +31,7 @@ import {
 const mechanicSchema = z.object({
   name: z.string().min(1, 'Nama wajib diisi'),
   phone: z.string().optional(),
-  specialization: z.string().optional(),
+  address: z.string().optional(),
   is_active: z.boolean(),
 });
 
@@ -65,7 +64,7 @@ export default function MechanicsPage() {
     setEditTarget(null);
     setPhotoFile(null);
     setPhotoPreview(null);
-    reset({ name: '', phone: '', specialization: '', is_active: true });
+    reset({ name: '', phone: '', address: '', is_active: true });
     setDialogOpen(true);
   }
 
@@ -76,7 +75,7 @@ export default function MechanicsPage() {
     reset({
       name: m.name,
       phone: m.phone ?? '',
-      specialization: m.specialization ?? '',
+      address: m.address ?? '',
       is_active: m.is_active,
     });
     setDialogOpen(true);
@@ -93,8 +92,7 @@ export default function MechanicsPage() {
     const form = new FormData();
     form.append('name', values.name);
     if (values.phone) form.append('phone', values.phone);
-    if (values.specialization)
-      form.append('specialization', values.specialization);
+    if (values.address) form.append('address', values.address);
     form.append('is_active', String(values.is_active));
     if (photoFile) form.append('photo', photoFile);
 
@@ -158,14 +156,14 @@ export default function MechanicsPage() {
                       <XCircle className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
                     )}
                   </div>
-                  {m.specialization && (
-                    <Badge variant="secondary" className="text-[10px] mt-0.5">
-                      {m.specialization}
-                    </Badge>
-                  )}
                   {m.phone && (
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {m.phone}
+                    </p>
+                  )}
+                  {m.address && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      {m.address}
                     </p>
                   )}
                   {!m.is_active && (
@@ -242,8 +240,8 @@ export default function MechanicsPage() {
                 <Input id="phone" {...register('phone')} />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="specialization">Spesialisasi</Label>
-                <Input id="specialization" {...register('specialization')} />
+                <Label htmlFor="address">Alamat</Label>
+                <Input id="address" {...register('address')} />
               </div>
             </div>
 

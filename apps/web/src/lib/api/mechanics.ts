@@ -4,7 +4,7 @@ export interface Mechanic {
   id: number;
   name: string;
   phone: string | null;
-  specialization: string | null;
+  address: string | null;
   is_active: boolean;
   photo_url: string | null;
 }

@@ -227,9 +227,6 @@ export default function DashboardPage() {
         <StatCard
           label="Penjualan Hari Ini"
           value={isLoading ? '—' : formatRupiah(stats?.today.sales ?? 0)}
-          delta={isLoading ? undefined : '+18.2%'}
-          spark={[22, 40, 28, 55, 42, 68, 58]}
-          sparkColor="#15803d"
           icon={<DollarSign className="h-3.5 w-3.5" />}
           iconBg="#f0fdf4"
           iconColor="#15803d"
@@ -238,9 +235,6 @@ export default function DashboardPage() {
         <StatCard
           label="Transaksi Hari Ini"
           value={isLoading ? '—' : stats?.today.transactions ?? 0}
-          delta={isLoading ? undefined : '+3'}
-          spark={[3, 5, 2, 6, 4, 8, 5]}
-          sparkColor="#c0601e"
           icon={<Receipt className="h-3.5 w-3.5" />}
           iconBg="var(--orange-50)"
           iconColor="var(--orange-700)"
@@ -249,16 +243,12 @@ export default function DashboardPage() {
         <StatCard
           label="Penjualan Bulan Ini"
           value={isLoading ? '—' : formatRupiah(stats?.month.sales ?? 0)}
-          delta={isLoading ? undefined : '+7.4%'}
-          spark={[50, 62, 48, 72, 60, 80, 68]}
           icon={<TrendingUp className="h-3.5 w-3.5" />}
           loading={isLoading}
         />
         <StatCard
           label="Transaksi Bulan Ini"
           value={isLoading ? '—' : stats?.month.transactions ?? 0}
-          delta={isLoading ? undefined : '+12'}
-          spark={[40, 52, 45, 65, 55, 70, 62]}
           icon={<Receipt className="h-3.5 w-3.5" />}
           iconBg="#f8fafc"
           iconColor="#64748b"

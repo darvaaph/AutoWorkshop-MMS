@@ -1,16 +1,7 @@
 'use client';
 
 import { type ChangeEvent, useState } from 'react';
-import {
-  Plus,
-  Search,
-  Pencil,
-  Trash2,
-  User,
-  Car,
-  Eye,
-  Filter,
-} from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, User, Eye, Filter } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -195,15 +186,14 @@ export default function CustomersPage() {
         <div
           className="grid text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em] px-4 py-2.5 border-b"
           style={{
-            gridTemplateColumns: '2fr 1.2fr 2fr 80px 120px 90px',
+            gridTemplateColumns: '2fr 1.2fr 2fr 130px 90px',
             background: '#fafafa',
           }}
         >
           <div>Pelanggan</div>
           <div>Telepon</div>
           <div>Alamat</div>
-          <div className="text-center">Kendaraan</div>
-          <div>Servis Terakhir</div>
+          <div>Bergabung</div>
           <div />
         </div>
 
@@ -226,23 +216,18 @@ export default function CustomersPage() {
           </div>
         ) : (
           <div className="divide-y">
-            {customers.map((c, idx) => {
-              const lastService = [
-                '2 hari lalu',
-                '1 minggu lalu',
-                '3 hari lalu',
-                '2 minggu lalu',
-                'Kemarin',
-                '5 hari lalu',
-                'Hari ini',
-                '1 bulan lalu',
-              ][idx % 8];
+            {customers.map(c => {
+              const joinedDate = new Intl.DateTimeFormat('id-ID', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              }).format(new Date(c.createdAt));
               return (
                 <div
                   key={c.id}
                   className="grid items-center px-4 py-3 hover:bg-slate-50 transition-colors"
                   style={{
-                    gridTemplateColumns: '2fr 1.2fr 2fr 80px 120px 90px',
+                    gridTemplateColumns: '2fr 1.2fr 2fr 130px 90px',
                   }}
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -277,24 +262,7 @@ export default function CustomersPage() {
                     {c.address ?? '—'}
                   </div>
 
-                  <div className="flex justify-center">
-                    <span
-                      className="inline-flex items-center gap-1 h-[22px] px-2 rounded-full text-[11.5px] font-semibold border"
-                      style={{
-                        background: 'var(--navy-50)',
-                        color: 'var(--navy-800)',
-                        borderColor: 'var(--navy-100)',
-                      }}
-                    >
-                      <Car className="h-2.5 w-2.5" />
-                      {(c as Customer & { vehicles_count?: number })
-                        .vehicles_count ?? 0}
-                    </span>
-                  </div>
-
-                  <div className="text-[12px] text-slate-500">
-                    {lastService}
-                  </div>
+                  <div className="text-[12px] text-slate-500">{joinedDate}</div>
 
                   <div className="flex items-center gap-1 justify-end">
                     <Button
