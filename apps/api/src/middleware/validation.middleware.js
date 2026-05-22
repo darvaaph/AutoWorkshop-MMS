@@ -144,7 +144,7 @@ const validateCustomer = [
 // ==================== VEHICLE VALIDATORS ====================
 
 const validateVehicle = [
-    body('plate_number')
+    body('license_plate')
         .trim()
         .notEmpty()
         .withMessage('Nomor plat wajib diisi')

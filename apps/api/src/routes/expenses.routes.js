@@ -1,22 +1,23 @@
 const express = require('express');
 const expensesController = require('../controllers/expenses.controller');
-const { authMiddleware, roleMiddleware } = require('../middleware');
+const { verifyToken, requireRole } = require('../middleware/auth.middleware');
+const { validateExpense, handleValidationErrors } = require('../middleware/validation.middleware');
 
 const router = express.Router();
 
 // Get all expenses
-router.get('/', authMiddleware, expensesController.getAllExpenses);
+router.get('/', verifyToken, expensesController.getAllExpenses);
 
 // Get a single expense by ID
-router.get('/:id', authMiddleware, expensesController.getExpenseById);
+router.get('/:id', verifyToken, expensesController.getExpenseById);
 
 // Create a new expense
-router.post('/', authMiddleware, roleMiddleware('ADMIN'), expensesController.createExpense);
+router.post('/', verifyToken, requireRole('ADMIN'), validateExpense, handleValidationErrors, expensesController.createExpense);
 
 // Update an existing expense
-router.put('/:id', authMiddleware, roleMiddleware('ADMIN'), expensesController.updateExpense);
+router.put('/:id', verifyToken, requireRole('ADMIN'), validateExpense, handleValidationErrors, expensesController.updateExpense);
 
 // Delete an expense
-router.delete('/:id', authMiddleware, roleMiddleware('ADMIN'), expensesController.deleteExpense);
+router.delete('/:id', verifyToken, requireRole('ADMIN'), expensesController.deleteExpense);
 
 module.exports = router;

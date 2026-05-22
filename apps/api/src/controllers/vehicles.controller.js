@@ -13,9 +13,9 @@ exports.getAllVehicles = async (req, res) => {
         const vehicles = await Vehicle.findAll({
             attributes: ['id', 'customer_id', 'license_plate', 'brand', 'model', 'current_km', 'next_service_date', 'next_service_km', 'reminder_sent_at', 'reminder_sent_by', 'reminder_notes', 'image_url', 'createdAt', 'updatedAt']
         });
-        res.status(200).json(vehicles);
+        res.status(200).json({ success: true, data: vehicles });
     } catch (error) {
-        res.status(500).json({ message: 'Error retrieving vehicles', error });
+        res.status(500).json({ success: false, message: 'Error retrieving vehicles', error });
     }
 };
 
@@ -29,9 +29,9 @@ exports.getVehicleById = async (req, res) => {
         if (!vehicle) {
             return res.status(404).json({ message: 'Vehicle not found' });
         }
-        res.status(200).json(vehicle);
+        res.status(200).json({ success: true, data: vehicle });
     } catch (error) {
-        res.status(500).json({ message: 'Error retrieving vehicle', error });
+        res.status(500).json({ success: false, message: 'Error retrieving vehicle', error });
     }
 };
 
@@ -73,9 +73,9 @@ exports.createVehicle = async (req, res) => {
             customer_id, license_plate, brand, model, image_url: imageUrl
         }, req);
         
-        res.status(201).json(newVehicle);
+        res.status(201).json({ success: true, data: newVehicle });
     } catch (error) {
-        res.status(500).json({ message: 'Error creating vehicle', error });
+        res.status(500).json({ success: false, message: 'Error creating vehicle', error });
     }
 };
 
@@ -164,9 +164,9 @@ exports.updateVehicle = async (req, res) => {
             console.warn('Audit logging failed:', auditError.message);
         }
         
-        res.status(200).json(vehicle);
+        res.status(200).json({ success: true, data: vehicle });
     } catch (error) {
-        res.status(500).json({ message: 'Error updating vehicle', error });
+        res.status(500).json({ success: false, message: 'Error updating vehicle', error });
     }
 };
 

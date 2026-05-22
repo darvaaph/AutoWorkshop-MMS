@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mechanicsController = require('../controllers/mechanics.controller');
 const { verifyToken, requireRole } = require('../middleware/auth.middleware');
+const { validateMechanic, handleValidationErrors } = require('../middleware/validation.middleware');
 const multer = require('multer');
 const path = require('path');
 
@@ -55,10 +56,10 @@ router.put('/:id/details', requireRole('ADMIN'), mechanicsController.updateMecha
 router.get('/:id', mechanicsController.getMechanicById);
 
 // Create a new mechanic
-router.post('/', requireRole('ADMIN'), optionalUpload, mechanicsController.createMechanic);
+router.post('/', requireRole('ADMIN'), optionalUpload, validateMechanic, handleValidationErrors, mechanicsController.createMechanic);
 
 // Update a mechanic by ID
-router.put('/:id', requireRole('ADMIN'), optionalUpload, mechanicsController.updateMechanic);
+router.put('/:id', requireRole('ADMIN'), optionalUpload, validateMechanic, handleValidationErrors, mechanicsController.updateMechanic);
 
 // Delete a mechanic by ID
 router.delete('/:id', requireRole('ADMIN'), mechanicsController.deleteMechanic);

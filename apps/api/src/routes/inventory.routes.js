@@ -1,15 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const inventoryController = require('../controllers/inventory.controller');
-const { verifyToken } = require('../middleware/auth.middleware');
-const { requireRole } = require('../middleware/role.middleware');
+const { verifyToken, requireRole } = require('../middleware/auth.middleware');
+const { validateInventory, handleValidationErrors } = require('../middleware/validation.middleware');
 
 // All routes require authentication
 router.use(verifyToken);
 
 // ============ STOCK IN (BARANG MASUK) ============
 // Stock In dengan HPP Moving Average
-router.post('/in', inventoryController.addInventoryIn);
+router.post('/in', validateInventory, handleValidationErrors, inventoryController.addInventoryIn);
 
 // ============ STOCK AUDIT / STOCK OPNAME ============
 // Stock Audit - Penyesuaian stok sesuai inventaris aktual
@@ -30,7 +30,7 @@ router.get('/stock-audit/report', inventoryController.getStockDiscrepancyReport)
 router.get('/', inventoryController.getInventoryLogs);
 
 // Create a new inventory log
-router.post('/', inventoryController.addInventoryLog);
+router.post('/', validateInventory, handleValidationErrors, inventoryController.addInventoryLog);
 
 // Update an inventory log by ID
 router.put('/:id', inventoryController.updateInventoryLog);

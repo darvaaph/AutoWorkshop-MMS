@@ -13,9 +13,9 @@ exports.getAllCustomers = async (req, res) => {
         const customers = await Customer.findAll({
             attributes: ['id', 'name', 'phone', 'address', 'photo_url', 'createdAt', 'updatedAt']
         });
-        res.status(200).json(customers);
+        res.status(200).json({ success: true, data: customers });
     } catch (error) {
-        res.status(500).json({ message: 'Error retrieving customers', error });
+        res.status(500).json({ success: false, message: 'Error retrieving customers', error });
     }
 };
 
@@ -29,9 +29,9 @@ exports.getCustomerById = async (req, res) => {
         if (!customer) {
             return res.status(404).json({ message: 'Customer not found' });
         }
-        res.status(200).json(customer);
+        res.status(200).json({ success: true, data: customer });
     } catch (error) {
-        res.status(500).json({ message: 'Error retrieving customer', error });
+        res.status(500).json({ success: false, message: 'Error retrieving customer', error });
     }
 };
 
@@ -89,9 +89,9 @@ exports.createCustomer = async (req, res) => {
             console.warn('Audit logging failed:', auditError.message);
         }
         
-        res.status(201).json(newCustomer);
+        res.status(201).json({ success: true, data: newCustomer });
     } catch (error) {
-        res.status(500).json({ message: 'Error creating customer', error });
+        res.status(500).json({ success: false, message: 'Error creating customer', error });
     }
 };
 
@@ -177,12 +177,12 @@ exports.updateCustomer = async (req, res) => {
             console.warn('Audit logging failed:', auditError.message);
         }
         
-        res.status(200).json(customer);
+        res.status(200).json({ success: true, data: customer });
     } catch (error) {
         console.error('Update customer error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Error updating customer', 
+            message: 'Error updating customer',
             error: error.message || 'Unknown error',
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
@@ -216,9 +216,9 @@ exports.deleteCustomer = async (req, res) => {
             console.warn('Audit logging failed:', auditError.message);
         }
         
-        res.status(200).json({ message: 'Customer and associated vehicles deleted successfully' });
+        res.status(200).json({ success: true, message: 'Customer and associated vehicles deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error deleting customer', error });
+        res.status(500).json({ success: false, message: 'Error deleting customer', error });
     }
 };
 

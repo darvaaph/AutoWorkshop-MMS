@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const vehiclesController = require('../controllers/vehicles.controller');
 const { verifyToken } = require('../middleware/auth.middleware');
+const { validateVehicle, handleValidationErrors } = require('../middleware/validation.middleware');
 const multer = require('multer');
 const path = require('path');
 
@@ -54,10 +55,10 @@ router.get('/:id', vehiclesController.getVehicleById);
 router.post('/:id/upload-image', upload.single('image'), vehiclesController.uploadVehicleImage);
 
 // Create a new vehicle
-router.post('/', optionalUpload, vehiclesController.createVehicle);
+router.post('/', optionalUpload, validateVehicle, handleValidationErrors, vehiclesController.createVehicle);
 
 // Update a vehicle by ID
-router.put('/:id', optionalUpload, vehiclesController.updateVehicle);
+router.put('/:id', optionalUpload, validateVehicle, handleValidationErrors, vehiclesController.updateVehicle);
 
 // Delete a vehicle by ID
 router.delete('/:id', vehiclesController.deleteVehicle);
