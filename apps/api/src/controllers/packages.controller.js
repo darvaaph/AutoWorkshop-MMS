@@ -83,6 +83,17 @@ exports.getAllPackages = async (req, res) => {
                 } else if (item.service) {
                     // Service component (no stock, just price)
                     totalComponentSellPrice += parseFloat(item.service.price || 0) * item.qty;
+                } else {
+                    isAvailable = false;
+                    if (!unavailableReason) {
+                        if (item.product_id) {
+                            unavailableReason = `Produk komponen (ID: ${item.product_id}) sudah dihapus`;
+                        } else if (item.service_id) {
+                            unavailableReason = `Jasa komponen (ID: ${item.service_id}) sudah dihapus`;
+                        } else {
+                            unavailableReason = 'Komponen paket tidak valid';
+                        }
+                    }
                 }
             });
 
@@ -201,6 +212,26 @@ exports.getPackageById = async (req, res) => {
                 }
             } else if (item.service) {
                 totalComponentSellPrice += parseFloat(item.service.price || 0) * item.qty;
+            } else {
+                isAvailable = false;
+                if (item.product_id) {
+                    stockIssues.push({
+                        product_id: item.product_id,
+                        status: 'DELETED',
+                        message: `Produk komponen (ID: ${item.product_id}) sudah dihapus`
+                    });
+                } else if (item.service_id) {
+                    stockIssues.push({
+                        service_id: item.service_id,
+                        status: 'DELETED',
+                        message: `Jasa komponen (ID: ${item.service_id}) sudah dihapus`
+                    });
+                } else {
+                    stockIssues.push({
+                        status: 'INVALID',
+                        message: 'Komponen paket tidak valid'
+                    });
+                }
             }
         });
 

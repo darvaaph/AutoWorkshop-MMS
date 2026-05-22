@@ -1,6 +1,6 @@
 // reports.service.js - Report generation logic
 
-const { Op } = require('sequelize');
+const { Op, literal } = require('sequelize');
 const Transaction = require('../models/transaction.model');
 const Payment = require('../models/payment.model');
 const Expense = require('../models/expense.model');
@@ -21,21 +21,40 @@ class ReportsService {
         
         const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-        // Today's stats (placeholder - implement based on your transaction model)
-        const todaySales = 0;
-        const todayTransactions = 0;
-        
+        // Today's stats
+        const todayTransactions = await Transaction.count({
+            where: {
+                date: { [Op.between]: [today, tomorrow] },
+                status: { [Op.notIn]: ['CANCELLED'] }
+            }
+        });
+        const todaySalesRaw = await Transaction.sum('total_amount', {
+            where: {
+                date: { [Op.between]: [today, tomorrow] },
+                status: { [Op.notIn]: ['CANCELLED'] }
+            }
+        });
+        const todaySales = todaySalesRaw || 0;
+
         // Monthly stats
-        const monthlySales = 0;
-        const monthlyTransactions = 0;
-        
+        const monthlyTransactions = await Transaction.count({
+            where: {
+                date: { [Op.between]: [startOfMonth, tomorrow] },
+                status: { [Op.notIn]: ['CANCELLED'] }
+            }
+        });
+        const monthlySalesRaw = await Transaction.sum('total_amount', {
+            where: {
+                date: { [Op.between]: [startOfMonth, tomorrow] },
+                status: { [Op.notIn]: ['CANCELLED'] }
+            }
+        });
+        const monthlySales = monthlySalesRaw || 0;
+
         // Product counts
         const totalProducts = await Product.count();
         const lowStockProducts = await Product.count({
-            where: {
-                stock: { [Op.lte]: 5 },
-                stock: { [Op.gt]: 0 }
-            }
+            where: literal('stock <= min_stock_alert AND stock > 0')
         });
         
         // Customer counts

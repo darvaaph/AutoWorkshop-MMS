@@ -2,6 +2,8 @@
 
 const { Op } = require('sequelize');
 const Product = require('../models/product.model');
+const Package = require('../models/package.model');
+const PackageItem = require('../models/package-item.model');
 const InventoryLog = require('../models/inventory-log.model');
 const auditService = require('../services/audit.service');
 const { sequelize } = require('../config/database');
@@ -400,6 +402,42 @@ exports.deleteProduct = async (req, res) => {
             return res.status(404).json({ 
                 success: false, 
                 message: 'Product not found' 
+            });
+        }
+
+        const activePackageItems = await PackageItem.findAll({
+            where: { product_id: id },
+            attributes: ['id', 'package_id'],
+            include: [
+                {
+                    model: Package,
+                    as: 'package',
+                    required: true,
+                    attributes: ['id', 'name'],
+                    where: { is_active: true }
+                }
+            ]
+        });
+
+        if (activePackageItems.length > 0) {
+            const impactedPackagesMap = new Map();
+            activePackageItems.forEach(item => {
+                if (item.package) {
+                    impactedPackagesMap.set(item.package.id, {
+                        id: item.package.id,
+                        name: item.package.name
+                    });
+                }
+            });
+
+            const impactedPackages = Array.from(impactedPackagesMap.values());
+
+            return res.status(409).json({
+                success: false,
+                message: 'Produk masih digunakan oleh paket aktif. Hapus dari paket/nonaktifkan paket terlebih dahulu.',
+                data: {
+                    impacted_packages: impactedPackages
+                }
             });
         }
 
