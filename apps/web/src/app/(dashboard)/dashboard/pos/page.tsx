@@ -18,10 +18,12 @@ import { useVehicles } from '@/hooks/use-vehicles';
 import { useMechanics } from '@/hooks/use-mechanics';
 import { useProducts } from '@/hooks/use-products';
 import { useServices } from '@/hooks/use-services';
+import { usePackages } from '@/hooks/use-packages';
 import { useCreateTransaction } from '@/hooks/use-transactions';
 import type { Vehicle } from '@/lib/api/vehicles';
 import type { Product } from '@/lib/api/products';
 import type { Service } from '@/lib/api/services';
+import type { Package } from '@/lib/api/packages';
 import type {
   CreateTransactionItem,
   PaymentMethod,
@@ -31,11 +33,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-type ItemTab = 'PRODUCT' | 'SERVICE' | 'EXTERNAL';
+type ItemTab = 'PRODUCT' | 'SERVICE' | 'PACKAGE' | 'EXTERNAL';
 
 interface CartItem {
   key: string;
-  item_type: 'PRODUCT' | 'SERVICE' | 'EXTERNAL';
+  item_type: 'PRODUCT' | 'SERVICE' | 'PACKAGE' | 'EXTERNAL';
   item_id?: number;
   item_name: string;
   base_price: number;
@@ -89,6 +91,11 @@ export default function PosPage() {
     activeTab === 'PRODUCT' ? { search: itemSearch || undefined } : undefined
   );
   const { data: services } = useServices();
+  const { data: packagesData } = usePackages(
+    activeTab === 'PACKAGE'
+      ? { search: itemSearch || undefined, active_only: true }
+      : undefined
+  );
   const createTrx = useCreateTransaction();
 
   const products = productsData?.products ?? [];
@@ -99,6 +106,7 @@ export default function PosPage() {
           : true
       )
     : [];
+  const packages = packagesData?.packages ?? [];
 
   const subtotal = cart.reduce(
     (sum, item) => sum + item.base_price * item.qty,
@@ -402,29 +410,33 @@ export default function PosPage() {
             </p>
 
             {/* Tabs */}
-            <div className="flex gap-1">
-              {(['PRODUCT', 'SERVICE', 'EXTERNAL'] as ItemTab[]).map(tab => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => {
-                    setActiveTab(tab);
-                    setItemSearch('');
-                  }}
-                  className="px-3 h-8 rounded-[8px] text-[12.5px] font-[550] transition-all"
-                  style={
-                    activeTab === tab
-                      ? { background: 'var(--navy-800)', color: '#fff' }
-                      : { background: '#f1f5f9', color: '#64748b' }
-                  }
-                >
-                  {tab === 'PRODUCT'
-                    ? 'Produk'
-                    : tab === 'SERVICE'
-                    ? 'Jasa'
-                    : 'Lainnya'}
-                </button>
-              ))}
+            <div className="flex gap-1 flex-wrap">
+              {(['PRODUCT', 'SERVICE', 'PACKAGE', 'EXTERNAL'] as ItemTab[]).map(
+                tab => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(tab);
+                      setItemSearch('');
+                    }}
+                    className="px-3 h-8 rounded-[8px] text-[12.5px] font-[550] transition-all"
+                    style={
+                      activeTab === tab
+                        ? { background: 'var(--navy-800)', color: '#fff' }
+                        : { background: '#f1f5f9', color: '#64748b' }
+                    }
+                  >
+                    {tab === 'PRODUCT'
+                      ? 'Produk'
+                      : tab === 'SERVICE'
+                      ? 'Jasa'
+                      : tab === 'PACKAGE'
+                      ? 'Paket'
+                      : 'Lainnya'}
+                  </button>
+                )
+              )}
             </div>
 
             {activeTab !== 'EXTERNAL' ? (
@@ -434,7 +446,11 @@ export default function PosPage() {
                   <Input
                     className="pl-9 h-9"
                     placeholder={
-                      activeTab === 'PRODUCT' ? 'Cari produk…' : 'Cari jasa…'
+                      activeTab === 'PRODUCT'
+                        ? 'Cari produk…'
+                        : activeTab === 'SERVICE'
+                        ? 'Cari jasa…'
+                        : 'Cari paket…'
                     }
                     value={itemSearch}
                     onChange={e => setItemSearch(e.target.value)}
@@ -503,8 +519,48 @@ export default function PosPage() {
                       </button>
                     ))}
 
+                  {activeTab === 'PACKAGE' &&
+                    packages.map((pkg: Package) => (
+                      <button
+                        key={pkg.id}
+                        type="button"
+                        disabled={!pkg.calculated.is_available}
+                        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-50 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() =>
+                          addToCart({
+                            item_type: 'PACKAGE',
+                            item_id: pkg.id,
+                            item_name: pkg.name,
+                            base_price: parseFloat(pkg.price),
+                          })
+                        }
+                      >
+                        <div>
+                          <p className="text-[13px] font-[500]">{pkg.name}</p>
+                          <p className="text-[11px] text-slate-400">
+                            {pkg.items.length} komponen
+                            {!pkg.calculated.is_available && (
+                              <span className="text-red-500 ml-1">
+                                · Stok kurang
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <span
+                          className="text-[12.5px] font-[600] flex-shrink-0 ml-3"
+                          style={{
+                            fontFamily: 'ui-monospace, monospace',
+                            color: 'var(--navy-900)',
+                          }}
+                        >
+                          {formatRupiah(pkg.price)}
+                        </span>
+                      </button>
+                    ))}
+
                   {(activeTab === 'PRODUCT' && products.length === 0) ||
-                  (activeTab === 'SERVICE' && filteredServices.length === 0) ? (
+                  (activeTab === 'SERVICE' && filteredServices.length === 0) ||
+                  (activeTab === 'PACKAGE' && packages.length === 0) ? (
                     <p className="px-3 py-4 text-[13px] text-slate-400 text-center">
                       Tidak ada hasil
                     </p>
