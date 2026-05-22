@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
+import { useQueryClient } from '@tanstack/react-query';
 import {
   useMechanics,
   useCreateMechanic,
@@ -13,6 +14,11 @@ import {
   useDeleteMechanic,
 } from '@/hooks/use-mechanics';
 import type { Mechanic } from '@/lib/api/mechanics';
+import {
+  getMechanicDetailsApi,
+  updateMechanicDetailsApi,
+} from '@/lib/api/mechanics';
+import { useAuthStore } from '@/store/auth.store';
 import { getImageUrl } from '@/lib/format';
 import { PageHeader } from '@/components/shared/page-header';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
@@ -32,17 +38,23 @@ const mechanicSchema = z.object({
   name: z.string().min(1, 'Nama wajib diisi'),
   phone: z.string().optional(),
   address: z.string().optional(),
+  emergency_contact: z.string().optional(),
   is_active: z.boolean(),
 });
 
 type MechanicForm = z.infer<typeof mechanicSchema>;
 
 export default function MechanicsPage() {
+  const user = useAuthStore(s => s.user);
+  const isAdmin = user?.role === 'ADMIN';
+  const queryClient = useQueryClient();
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Mechanic | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Mechanic | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const { data: mechanics, isLoading } = useMechanics();
   const createMechanic = useCreateMechanic();
@@ -68,17 +80,33 @@ export default function MechanicsPage() {
     setDialogOpen(true);
   }
 
-  function openEdit(m: Mechanic) {
+  async function openEdit(m: Mechanic) {
     setEditTarget(m);
     setPhotoFile(null);
     setPhotoPreview(getImageUrl(m.photo_url));
     reset({
       name: m.name,
-      phone: m.phone ?? '',
-      address: m.address ?? '',
+      phone: '',
+      address: '',
+      emergency_contact: '',
       is_active: m.is_active,
     });
     setDialogOpen(true);
+
+    if (isAdmin) {
+      try {
+        const details = await getMechanicDetailsApi(m.id);
+        reset({
+          name: m.name,
+          phone: details.phone ?? '',
+          address: details.address ?? '',
+          emergency_contact: details.emergency_contact ?? '',
+          is_active: m.is_active,
+        });
+      } catch {
+        // non-fatal: form still works without contact details
+      }
+    }
   }
 
   function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
@@ -88,25 +116,45 @@ export default function MechanicsPage() {
     setPhotoPreview(URL.createObjectURL(file));
   }
 
-  function onSubmit(values: MechanicForm) {
+  async function onSubmit(values: MechanicForm) {
     const form = new FormData();
     form.append('name', values.name);
-    if (values.phone) form.append('phone', values.phone);
-    if (values.address) form.append('address', values.address);
     form.append('is_active', String(values.is_active));
     if (photoFile) form.append('photo', photoFile);
 
-    if (editTarget) {
-      updateMechanic.mutate(
-        { id: editTarget.id, form },
-        { onSuccess: () => setDialogOpen(false) }
-      );
-    } else {
-      createMechanic.mutate(form, { onSuccess: () => setDialogOpen(false) });
+    setIsSaving(true);
+    try {
+      if (editTarget) {
+        await new Promise<void>((resolve, reject) =>
+          updateMechanic.mutate(
+            { id: editTarget.id, form },
+            { onSuccess: () => resolve(), onError: reject }
+          )
+        );
+        await updateMechanicDetailsApi(editTarget.id, {
+          phone: values.phone || undefined,
+          address: values.address || undefined,
+          emergency_contact: values.emergency_contact || undefined,
+        });
+        await queryClient.invalidateQueries({ queryKey: ['mechanics'] });
+      } else {
+        await new Promise<void>((resolve, reject) =>
+          createMechanic.mutate(form, {
+            onSuccess: () => resolve(),
+            onError: reject,
+          })
+        );
+      }
+      setDialogOpen(false);
+    } catch {
+      // errors surfaced by mutation toasts if configured
+    } finally {
+      setIsSaving(false);
     }
   }
 
-  const isPending = createMechanic.isPending || updateMechanic.isPending;
+  const isPending =
+    createMechanic.isPending || updateMechanic.isPending || isSaving;
 
   return (
     <div className="space-y-6">
@@ -156,19 +204,14 @@ export default function MechanicsPage() {
                       <XCircle className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
                     )}
                   </div>
-                  {m.phone && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {m.phone}
-                    </p>
-                  )}
-                  {m.address && (
-                    <p className="text-xs text-muted-foreground truncate">
-                      {m.address}
-                    </p>
-                  )}
-                  {!m.is_active && (
-                    <p className="text-xs text-muted-foreground">Tidak aktif</p>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {m.is_active ? 'Aktif' : 'Tidak aktif'}
+                    {isAdmin && (
+                      <span className="ml-1.5 text-slate-300">
+                        · Edit untuk lihat detail
+                      </span>
+                    )}
+                  </p>
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
                   <Button
@@ -234,14 +277,40 @@ export default function MechanicsPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="phone">No. HP</Label>
-                <Input id="phone" {...register('phone')} />
+            <div className="space-y-3">
+              <p className="text-[11px] font-[600] text-slate-400 uppercase tracking-[0.06em]">
+                Informasi Kontak
+                {editTarget && (
+                  <span className="ml-1 font-normal normal-case text-slate-300">
+                    (dimuat dari server…)
+                  </span>
+                )}
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="phone">No. HP</Label>
+                  <Input
+                    id="phone"
+                    placeholder="08xx…"
+                    {...register('phone')}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="emergency_contact">Kontak Darurat</Label>
+                  <Input
+                    id="emergency_contact"
+                    placeholder="Nama / nomor"
+                    {...register('emergency_contact')}
+                  />
+                </div>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="address">Alamat</Label>
-                <Input id="address" {...register('address')} />
+                <Input
+                  id="address"
+                  placeholder="Alamat tempat tinggal"
+                  {...register('address')}
+                />
               </div>
             </div>
 
