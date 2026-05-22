@@ -10,7 +10,9 @@ export function middleware(request: NextRequest) {
 
   const isPublicPath = PUBLIC_PATHS.some(path => pathname.startsWith(path));
   const isProtectedPath =
-    pathname.startsWith(PROTECTED_PREFIX) || pathname === '/';
+    pathname.startsWith(PROTECTED_PREFIX) ||
+    pathname.startsWith('/print') ||
+    pathname === '/';
 
   if (!token && isProtectedPath) {
     const loginUrl = new URL('/login', request.url);

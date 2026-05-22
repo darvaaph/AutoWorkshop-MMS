@@ -9,6 +9,8 @@ import {
   ShoppingCart,
   Car,
   ChevronDown,
+  CheckCircle2,
+  Printer,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -74,6 +76,9 @@ export default function PosPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [paymentAmount, setPaymentAmount] = useState('');
   const [refNumber, setRefNumber] = useState('');
+
+  // Post-success
+  const [successTrxId, setSuccessTrxId] = useState<number | null>(null);
 
   // API
   const { data: vehicles, isLoading: vehiclesLoading } = useVehicles(
@@ -168,15 +173,69 @@ export default function PosPage() {
       },
       {
         onSuccess: trx => {
-          router.push(`/dashboard/transactions`);
-          // Open transaction detail by navigating with hash — simpler than state
-          void trx;
+          setSuccessTrxId(trx.id);
         },
       }
     );
   }
 
   const activeMechanics = mechanics?.filter(m => m.is_active) ?? [];
+
+  if (successTrxId !== null) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-5">
+        <div
+          className="w-16 h-16 rounded-full flex items-center justify-center"
+          style={{ background: '#f0fdf4' }}
+        >
+          <CheckCircle2 className="h-8 w-8 text-green-600" />
+        </div>
+        <div className="text-center">
+          <p
+            className="text-[20px] font-[650] tracking-[-0.02em]"
+            style={{ color: 'var(--navy-900)' }}
+          >
+            Transaksi Berhasil
+          </p>
+          <p className="text-[13px] text-slate-500 mt-1">
+            TRX-{String(successTrxId).padStart(4, '0')}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => window.open(`/print/${successTrxId}`, '_blank')}
+            style={{ background: 'var(--navy-800)' }}
+            className="text-white hover:opacity-90"
+          >
+            <Printer className="h-4 w-4 mr-2" />
+            Cetak Struk
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => router.push('/dashboard/transactions')}
+          >
+            Lihat Transaksi
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setSuccessTrxId(null);
+              setCart([]);
+              setSelectedVehicle(null);
+              setSelectedMechanicId('');
+              setCurrentKm('');
+              setDiscount('');
+              setNotes('');
+              setPaymentAmount('');
+              setRefNumber('');
+            }}
+          >
+            Transaksi Baru
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

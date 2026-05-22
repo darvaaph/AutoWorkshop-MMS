@@ -159,3 +159,57 @@ export async function cancelTransactionApi(id: number): Promise<Transaction> {
   );
   return res.data.data;
 }
+
+export type PrintType = 'receipt' | 'workorder';
+
+export interface PrintItem {
+  name: string;
+  qty: number;
+  price: number | null;
+  subtotal: number | null;
+  type: string;
+  is_header?: boolean;
+  is_component?: boolean;
+}
+
+export interface PrintPayment {
+  method: PaymentMethod;
+  amount: number;
+  date: string;
+  reference: string | null;
+}
+
+export interface PrintData {
+  print_type: PrintType;
+  transaction_id: number;
+  date: string;
+  status: TransactionStatus;
+  cashier: string | null;
+  mechanic: string | null;
+  customer: { name: string; phone: string | null } | null;
+  vehicle: {
+    license_plate: string;
+    brand: string;
+    model: string;
+    current_km: number | null;
+  } | null;
+  items: PrintItem[];
+  subtotal: number;
+  discount: number;
+  total: number;
+  paid: number;
+  remaining: number;
+  payments: PrintPayment[];
+  notes: string | null;
+}
+
+export async function getPrintDataApi(
+  id: number,
+  type: PrintType = 'receipt'
+): Promise<PrintData> {
+  const res = await apiClient.get<{ data: PrintData }>(
+    `/transactions/${id}/print`,
+    { params: { type } }
+  );
+  return res.data.data;
+}

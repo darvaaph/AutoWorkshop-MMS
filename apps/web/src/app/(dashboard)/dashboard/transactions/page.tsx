@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Receipt, Search, Plus, Ban } from 'lucide-react';
+import { Receipt, Search, Plus, Ban, Printer } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -381,7 +381,18 @@ export default function TransactionsPage() {
                     {formatDate(detail.date)}
                   </p>
                 </div>
-                <StatusBadge status={detail.status} />
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={detail.status} />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-slate-400 hover:text-slate-700"
+                    title="Cetak struk"
+                    onClick={() => window.open(`/print/${detail.id}`, '_blank')}
+                  >
+                    <Printer className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
 
               {detail.vehicle && (
