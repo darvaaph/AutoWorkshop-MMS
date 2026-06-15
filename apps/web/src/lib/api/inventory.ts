@@ -14,7 +14,7 @@ export interface InventoryLog {
   reference_type: string | null;
   reference_id: string | null;
   notes: string | null;
-  createdAt: string;
+  created_at: string;
   product?: { id: number; sku: string; name: string };
 }
 

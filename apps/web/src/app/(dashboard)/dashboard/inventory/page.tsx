@@ -368,7 +368,7 @@ export default function InventoryPage() {
                         className="text-[11.5px] text-slate-500"
                         style={{ fontFamily: 'ui-monospace, monospace' }}
                       >
-                        {formatDate(log.createdAt)}
+                        {formatDate(log.created_at)}
                       </div>
 
                       <div

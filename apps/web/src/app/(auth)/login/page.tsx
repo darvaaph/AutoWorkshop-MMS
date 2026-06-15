@@ -63,7 +63,7 @@ export default function LoginPage() {
     }
   };
 
-  const FormPanel = () => (
+  const formPanel = (
     <div className="flex flex-col h-full p-8 md:p-12 bg-white">
       {/* Mobile logo */}
       <div className="flex md:hidden items-center gap-2.5 mb-8">
@@ -293,7 +293,7 @@ export default function LoginPage() {
 
       {/* Right form panel */}
       <div className="flex-1 md:flex-none md:w-[440px] flex flex-col">
-        <FormPanel />
+        {formPanel}
       </div>
     </div>
   );
