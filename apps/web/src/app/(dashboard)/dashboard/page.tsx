@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   ShoppingCart,
   TrendingUp,
@@ -13,14 +13,33 @@ import {
   BarChart3,
   DollarSign,
   ArrowUpRight,
+  Phone,
+  CheckCircle2,
+  MessageCircle,
 } from 'lucide-react';
 
 import { useDashboard, useDueServiceVehicles } from '@/hooks/use-dashboard';
+import { useMarkContacted } from '@/hooks/use-vehicles';
+import type { Vehicle } from '@/lib/api/vehicles';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatRupiah } from '@/lib/format';
+import { formatRupiah, formatDate, toWaPhone } from '@/lib/format';
 import { useAuthStore } from '@/store/auth.store';
 import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 /* ── Spark bar ── */
 function SparkBar({ data = [40, 65, 50, 80, 60, 95, 75], color = '#1b2d5e' }) {
@@ -182,6 +201,9 @@ export default function DashboardPage() {
   const { data: dueVehicles } = useDueServiceVehicles();
   const user = useAuthStore(state => state.user);
   const isAdmin = user?.role === 'ADMIN';
+  const [contactTarget, setContactTarget] = useState<Vehicle | null>(null);
+  const [contactNotes, setContactNotes] = useState('');
+  const markContacted = useMarkContacted();
 
   const greeting =
     new Date().getHours() < 12
@@ -489,7 +511,7 @@ export default function DashboardPage() {
                       {v.brand} {v.model}
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
+                  <div className="flex-shrink-0 flex flex-col items-end gap-1">
                     <div className="text-[12px] font-semibold text-red-700">
                       {v.next_service_date
                         ? new Intl.DateTimeFormat('id-ID', {
@@ -498,9 +520,34 @@ export default function DashboardPage() {
                           }).format(new Date(v.next_service_date))
                         : '—'}
                     </div>
-                    <span className="text-[10.5px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold mt-1 inline-block">
-                      Perlu Servis
-                    </span>
+                    {v.reminder_sent_at ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold cursor-default">
+                              <CheckCircle2 className="h-2.5 w-2.5" />
+                              Dihubungi
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-[200px] space-y-1 text-left">
+                            <p className="font-[550]">{formatDate(v.reminder_sent_at)}</p>
+                            {v.reminder_notes && (
+                              <p className="opacity-80">{v.reminder_notes}</p>
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold transition-colors"
+                        style={{ background: 'rgba(255,255,255,0.9)', color: '#991b1b', border: '1px solid #fca5a5' }}
+                        onClick={() => { setContactTarget(v); setContactNotes(''); }}
+                      >
+                        <Phone className="h-2.5 w-2.5" />
+                        Hubungi
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -508,6 +555,84 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Contact dialog */}
+      <Dialog open={!!contactTarget} onOpenChange={open => !open && setContactTarget(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Tandai Sudah Dihubungi</DialogTitle>
+          </DialogHeader>
+          {contactTarget && (
+            <div className="space-y-3">
+              <div className="rounded-lg bg-slate-50 px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="inline-flex items-center justify-center font-bold rounded px-2 py-0.5 text-[11px]"
+                    style={{
+                      background: '#1a1a1a',
+                      color: '#e8d84a',
+                      border: '1.5px solid #3a3620',
+                      fontFamily: 'ui-monospace, monospace',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {contactTarget.license_plate}
+                  </span>
+                  <span className="text-[13px] text-slate-600 font-[550]">
+                    {contactTarget.customer?.name}
+                  </span>
+                </div>
+                <p className="text-[11.5px] text-slate-400 mt-1">
+                  {contactTarget.brand} {contactTarget.model}
+                </p>
+              </div>
+              {contactTarget.customer?.phone && (
+                <a
+                  href={`https://wa.me/${toWaPhone(contactTarget.customer.phone)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 h-9 px-3 rounded-lg text-[12.5px] font-[550] w-full transition-opacity hover:opacity-80"
+                  style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}
+                >
+                  <MessageCircle className="h-4 w-4 flex-shrink-0" />
+                  <span>Buka WhatsApp</span>
+                  <span className="ml-auto font-mono text-[11px] text-green-600">{contactTarget.customer.phone}</span>
+                </a>
+              )}
+              <div className="space-y-1">
+                <Label>Catatan (opsional)</Label>
+                <textarea
+                  className="w-full border border-input rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+                  rows={3}
+                  placeholder="Hasil percakapan, janji servis, dsb."
+                  value={contactNotes}
+                  onChange={e => setContactNotes(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setContactTarget(null)}>
+                  Batal
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={markContacted.isPending}
+                  style={{ background: 'var(--navy-800)' }}
+                  className="text-white hover:opacity-90"
+                  onClick={() => {
+                    if (!contactTarget) return;
+                    markContacted.mutate(
+                      { id: contactTarget.id, notes: contactNotes },
+                      { onSuccess: () => setContactTarget(null) }
+                    );
+                  }}
+                >
+                  {markContacted.isPending ? 'Menyimpan…' : 'Tandai Dihubungi'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

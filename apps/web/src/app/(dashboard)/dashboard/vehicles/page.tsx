@@ -9,6 +9,10 @@ import {
   Car,
   AlertTriangle,
   Filter,
+  Phone,
+  CheckCircle2,
+  RotateCcw,
+  MessageCircle,
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,10 +23,12 @@ import {
   useCreateVehicle,
   useUpdateVehicle,
   useDeleteVehicle,
+  useMarkContacted,
+  useResetReminder,
 } from '@/hooks/use-vehicles';
 import { useCustomers } from '@/hooks/use-customers';
 import type { Vehicle } from '@/lib/api/vehicles';
-import { formatKm } from '@/lib/format';
+import { formatKm, formatDate, toWaPhone } from '@/lib/format';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +41,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 const vehicleSchema = z.object({
   customer_id: z.coerce.number().min(1, 'Pilih pelanggan'),
@@ -92,12 +104,17 @@ export default function VehiclesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Vehicle | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Vehicle | null>(null);
+  const [contactTarget, setContactTarget] = useState<Vehicle | null>(null);
+  const [contactNotes, setContactNotes] = useState('');
+  const [resetTarget, setResetTarget] = useState<Vehicle | null>(null);
 
   const { data: vehicles, isLoading } = useVehicles(search || undefined);
   const { data: customers } = useCustomers();
   const createVehicle = useCreateVehicle();
   const updateVehicle = useUpdateVehicle();
   const deleteVehicle = useDeleteVehicle();
+  const markContacted = useMarkContacted();
+  const resetReminder = useResetReminder();
 
   const {
     register,
@@ -343,35 +360,79 @@ export default function VehiclesPage() {
                       {formatKm(v.current_km)}
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right max-w-[110px]">
                     <div className="text-slate-400">Pemilik</div>
                     <div
-                      className="font-semibold mt-0.5"
+                      className="font-semibold mt-0.5 truncate"
                       style={{ color: 'var(--navy-900)' }}
                     >
-                      {v.customer?.name?.split(' ')[0] ?? '—'}
+                      {v.customer?.name ?? '—'}
                     </div>
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-1 justify-end mt-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-slate-400 hover:text-slate-700"
-                    onClick={() => openEdit(v)}
-                  >
-                    <Pencil className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-red-400 hover:text-red-600"
-                    onClick={() => setDeleteTarget(v)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                <div className="flex items-center justify-between mt-1">
+                  <div>
+                    {status !== 'ok' && (
+                      v.reminder_sent_at ? (
+                        <div className="flex items-center gap-1.5">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center gap-1 text-[10.5px] font-[550] text-green-700 cursor-default">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Sudah Dihubungi
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-[200px] space-y-1 text-left">
+                                <p className="font-[550]">{formatDate(v.reminder_sent_at)}</p>
+                                {v.reminder_notes && (
+                                  <p className="opacity-80">{v.reminder_notes}</p>
+                                )}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <button
+                            type="button"
+                            title="Reset reminder"
+                            className="text-slate-400 hover:text-slate-600 transition-colors"
+                            onClick={() => setResetTarget(v)}
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 h-6 px-2 rounded-lg text-[11px] font-[550] transition-colors"
+                          style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}
+                          onClick={() => { setContactTarget(v); setContactNotes(''); }}
+                        >
+                          <Phone className="h-2.5 w-2.5" />
+                          Hubungi
+                        </button>
+                      )
+                    )}
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-slate-400 hover:text-slate-700"
+                      onClick={() => openEdit(v)}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-red-400 hover:text-red-600"
+                      onClick={() => setDeleteTarget(v)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             );
@@ -491,6 +552,88 @@ export default function VehiclesPage() {
           if (!deleteTarget) return;
           deleteVehicle.mutate(deleteTarget.id, {
             onSuccess: () => setDeleteTarget(null),
+          });
+        }}
+      />
+
+      {/* Contact dialog */}
+      <Dialog open={!!contactTarget} onOpenChange={open => !open && setContactTarget(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Tandai Sudah Dihubungi</DialogTitle>
+          </DialogHeader>
+          {contactTarget && (
+            <div className="space-y-3">
+              <div className="rounded-lg bg-slate-50 px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <LicensePlate plate={contactTarget.license_plate} />
+                  <span className="text-[13px] text-slate-600 font-[550]">
+                    {contactTarget.customer?.name}
+                  </span>
+                </div>
+                <p className="text-[11.5px] text-slate-400 mt-1">
+                  {contactTarget.brand} {contactTarget.model}
+                </p>
+              </div>
+              {contactTarget.customer?.phone && (
+                <a
+                  href={`https://wa.me/${toWaPhone(contactTarget.customer.phone)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 h-9 px-3 rounded-lg text-[12.5px] font-[550] w-full transition-opacity hover:opacity-80"
+                  style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}
+                >
+                  <MessageCircle className="h-4 w-4 flex-shrink-0" />
+                  <span>Buka WhatsApp</span>
+                  <span className="ml-auto font-mono text-[11px] text-green-600">{contactTarget.customer.phone}</span>
+                </a>
+              )}
+              <div className="space-y-1">
+                <Label>Catatan (opsional)</Label>
+                <textarea
+                  className="w-full border border-input rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+                  rows={3}
+                  placeholder="Hasil percakapan, janji servis, dsb."
+                  value={contactNotes}
+                  onChange={e => setContactNotes(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setContactTarget(null)}>
+                  Batal
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={markContacted.isPending}
+                  style={{ background: 'var(--navy-800)' }}
+                  className="text-white hover:opacity-90"
+                  onClick={() => {
+                    if (!contactTarget) return;
+                    markContacted.mutate(
+                      { id: contactTarget.id, notes: contactNotes },
+                      { onSuccess: () => setContactTarget(null) }
+                    );
+                  }}
+                >
+                  {markContacted.isPending ? 'Menyimpan…' : 'Tandai Dihubungi'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset reminder confirm */}
+      <ConfirmDialog
+        open={!!resetTarget}
+        onOpenChange={open => !open && setResetTarget(null)}
+        title="Reset Status Reminder"
+        description={`Reset status "sudah dihubungi" untuk kendaraan ${resetTarget?.license_plate}?`}
+        loading={resetReminder.isPending}
+        onConfirm={() => {
+          if (!resetTarget) return;
+          resetReminder.mutate(resetTarget.id, {
+            onSuccess: () => setResetTarget(null),
           });
         }}
       />

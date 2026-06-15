@@ -52,3 +52,7 @@ export async function markContactedApi(
 ): Promise<void> {
   await apiClient.post(`/vehicles/${id}/mark-contacted`, { notes });
 }
+
+export async function resetReminderApi(id: number): Promise<void> {
+  await apiClient.post(`/vehicles/${id}/reset-reminder`, {});
+}

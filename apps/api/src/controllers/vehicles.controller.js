@@ -10,8 +10,25 @@ const auditService = require('../services/audit.service');
 // Get all vehicles
 exports.getAllVehicles = async (req, res) => {
     try {
+        const { search } = req.query;
+        const where = {};
+        if (search) {
+            where[Op.or] = [
+                { license_plate: { [Op.like]: `%${search}%` } },
+                { brand: { [Op.like]: `%${search}%` } },
+                { model: { [Op.like]: `%${search}%` } },
+            ];
+        }
+
         const vehicles = await Vehicle.findAll({
-            attributes: ['id', 'customer_id', 'license_plate', 'brand', 'model', 'current_km', 'next_service_date', 'next_service_km', 'reminder_sent_at', 'reminder_sent_by', 'reminder_notes', 'image_url', 'createdAt', 'updatedAt']
+            where,
+            attributes: ['id', 'customer_id', 'license_plate', 'brand', 'model', 'current_km', 'next_service_date', 'next_service_km', 'reminder_sent_at', 'reminder_sent_by', 'reminder_notes', 'image_url', 'createdAt', 'updatedAt'],
+            include: [{
+                model: Customer,
+                as: 'customer',
+                attributes: ['id', 'name', 'phone']
+            }],
+            order: [['createdAt', 'DESC']]
         });
         res.status(200).json({ success: true, data: vehicles });
     } catch (error) {
@@ -24,7 +41,12 @@ exports.getVehicleById = async (req, res) => {
     const { id } = req.params;
     try {
         const vehicle = await Vehicle.findByPk(id, {
-            attributes: ['id', 'customer_id', 'license_plate', 'brand', 'model', 'current_km', 'next_service_date', 'next_service_km', 'reminder_sent_at', 'reminder_sent_by', 'reminder_notes', 'image_url', 'createdAt', 'updatedAt']
+            attributes: ['id', 'customer_id', 'license_plate', 'brand', 'model', 'current_km', 'next_service_date', 'next_service_km', 'reminder_sent_at', 'reminder_sent_by', 'reminder_notes', 'image_url', 'createdAt', 'updatedAt'],
+            include: [{
+                model: Customer,
+                as: 'customer',
+                attributes: ['id', 'name', 'phone']
+            }]
         });
         if (!vehicle) {
             return res.status(404).json({ message: 'Vehicle not found' });

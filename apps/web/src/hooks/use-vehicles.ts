@@ -6,6 +6,7 @@ import {
   updateVehicleApi,
   deleteVehicleApi,
   markContactedApi,
+  resetReminderApi,
   type Vehicle,
 } from '@/lib/api/vehicles';
 
@@ -63,5 +64,17 @@ export function useMarkContacted() {
       toast.success('Kendaraan ditandai sudah dihubungi');
     },
     onError: () => toast.error('Gagal menandai kendaraan'),
+  });
+}
+
+export function useResetReminder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: resetReminderApi,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vehicles'] });
+      toast.success('Status reminder berhasil direset');
+    },
+    onError: () => toast.error('Gagal mereset reminder'),
   });
 }
