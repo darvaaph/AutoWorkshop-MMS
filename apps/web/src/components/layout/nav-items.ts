@@ -3,7 +3,6 @@ import {
   Users,
   Car,
   ShoppingCart,
-  Receipt,
   Package,
   PackageOpen,
   Wrench,
@@ -13,6 +12,7 @@ import {
   ClipboardList,
   UserCog,
   ScrollText,
+  Wallet,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UserRole } from '@/types/auth.types';
@@ -27,6 +27,7 @@ export interface NavItem {
 }
 
 export const navItems: NavItem[] = [
+  // ── Utama ──
   {
     label: 'Dashboard',
     href: '/dashboard',
@@ -35,96 +36,104 @@ export const navItems: NavItem[] = [
     section: 'Utama',
   },
   {
-    label: 'Transaksi Baru',
+    label: 'Transaksi (POS)',
     href: '/dashboard/pos',
     icon: ShoppingCart,
     roles: ['ADMIN', 'CASHIER'],
     section: 'Utama',
     accent: true,
   },
-  {
-    label: 'Riwayat',
-    href: '/dashboard/transactions',
-    icon: Receipt,
-    roles: ['ADMIN', 'CASHIER'],
-    section: 'Utama',
-  },
-  {
-    label: 'Pelanggan',
-    href: '/dashboard/customers',
-    icon: Users,
-    roles: ['ADMIN', 'CASHIER'],
-    section: 'Master Data',
-  },
-  {
-    label: 'Kendaraan',
-    href: '/dashboard/vehicles',
-    icon: Car,
-    roles: ['ADMIN', 'CASHIER'],
-    section: 'Master Data',
-  },
+
+  // ── Katalog ──
   {
     label: 'Produk',
     href: '/dashboard/products',
     icon: Package,
     roles: ['ADMIN'],
-    section: 'Master Data',
+    section: 'Katalog',
   },
   {
-    label: 'Jasa',
+    label: 'Layanan',
     href: '/dashboard/services',
     icon: Wrench,
     roles: ['ADMIN'],
-    section: 'Master Data',
+    section: 'Katalog',
   },
   {
     label: 'Paket',
     href: '/dashboard/packages',
     icon: PackageOpen,
     roles: ['ADMIN'],
-    section: 'Master Data',
+    section: 'Katalog',
+  },
+
+  // ── Data ──
+  {
+    label: 'Pelanggan',
+    href: '/dashboard/customers',
+    icon: Users,
+    roles: ['ADMIN', 'CASHIER'],
+    section: 'Data',
   },
   {
-    label: 'Mekanik',
+    label: 'Kendaraan',
+    href: '/dashboard/vehicles',
+    icon: Car,
+    roles: ['ADMIN', 'CASHIER'],
+    section: 'Data',
+  },
+  {
+    label: 'Montir',
     href: '/dashboard/mechanics',
     icon: UserCog,
     roles: ['ADMIN'],
-    section: 'Master Data',
+    section: 'Data',
   },
+
+  // ── Operasional ──
   {
     label: 'Inventori',
     href: '/dashboard/inventory',
     icon: ClipboardList,
     roles: ['ADMIN'],
-    section: 'Manajemen',
+    section: 'Operasional',
   },
   {
     label: 'Pengeluaran',
     href: '/dashboard/expenses',
     icon: DollarSign,
     roles: ['ADMIN'],
-    section: 'Manajemen',
+    section: 'Operasional',
   },
+  {
+    label: 'Pembayaran',
+    href: '/dashboard/transactions',
+    icon: Wallet,
+    roles: ['ADMIN', 'CASHIER'],
+    section: 'Operasional',
+  },
+
+  // ── Lainnya ──
   {
     label: 'Laporan',
     href: '/dashboard/reports',
     icon: BarChart3,
     roles: ['ADMIN'],
-    section: 'Manajemen',
+    section: 'Lainnya',
   },
   {
     label: 'Audit Log',
     href: '/dashboard/audit-logs',
     icon: ScrollText,
     roles: ['ADMIN'],
-    section: 'Manajemen',
+    section: 'Lainnya',
   },
   {
     label: 'Pengaturan',
     href: '/dashboard/settings',
     icon: Settings,
     roles: ['ADMIN'],
-    section: 'Manajemen',
+    section: 'Lainnya',
   },
 ];
 

@@ -105,8 +105,20 @@ exports.updatePayment = async (req, res) => {
         const { amount, paymentMethod } = req.body;
         payment.amount = amount;
         payment.payment_method = paymentMethod;
-
         await payment.save();
+
+        const transaction = await Transaction.findByPk(payment.transaction_id);
+        if (transaction) {
+            const allPayments = await Payment.findAll({ where: { transaction_id: payment.transaction_id } });
+            const totalPaid = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+            const totalAmount = parseFloat(transaction.total_amount);
+            let newStatus;
+            if (totalPaid >= totalAmount) newStatus = 'PAID';
+            else if (totalPaid > 0) newStatus = 'PARTIAL';
+            else newStatus = transaction.status === 'PENDING' ? 'PENDING' : 'UNPAID';
+            await transaction.update({ status: newStatus });
+        }
+
         return res.status(200).json(payment);
     } catch (error) {
         return res.status(500).json({ message: 'Error updating payment', error });
@@ -121,7 +133,21 @@ exports.deletePayment = async (req, res) => {
             return res.status(404).json({ message: 'Payment not found' });
         }
 
+        const transactionId = payment.transaction_id;
         await payment.destroy();
+
+        const transaction = await Transaction.findByPk(transactionId);
+        if (transaction) {
+            const allPayments = await Payment.findAll({ where: { transaction_id: transactionId } });
+            const totalPaid = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+            const totalAmount = parseFloat(transaction.total_amount);
+            let newStatus;
+            if (totalPaid >= totalAmount) newStatus = 'PAID';
+            else if (totalPaid > 0) newStatus = 'PARTIAL';
+            else newStatus = transaction.status === 'PENDING' ? 'PENDING' : 'UNPAID';
+            await transaction.update({ status: newStatus });
+        }
+
         return res.status(204).send();
     } catch (error) {
         return res.status(500).json({ message: 'Error deleting payment', error });

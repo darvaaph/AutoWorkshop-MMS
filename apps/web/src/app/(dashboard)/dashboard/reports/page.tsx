@@ -437,7 +437,7 @@ export default function ReportsPage() {
           {/* Daily chart */}
           {salesLoading ? (
             <Skeleton className="h-40 w-full rounded-xl" />
-          ) : (sales?.daily?.length ?? 0) > 0 ? (
+          ) : sales && sales.daily.length > 0 ? (
             <DailyChart data={sales.daily} />
           ) : null}
 

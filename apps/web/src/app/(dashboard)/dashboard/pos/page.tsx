@@ -4,14 +4,19 @@ import { useState, useCallback } from 'react';
 import {
   Plus,
   Minus,
-  Trash2,
   Search,
   ShoppingCart,
   Car,
   ChevronDown,
   CheckCircle2,
   Printer,
+  Package,
+  Wrench,
+  PackageOpen,
+  Tag,
+  X,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useVehicles } from '@/hooks/use-vehicles';
@@ -23,42 +28,131 @@ import { useCreateTransaction } from '@/hooks/use-transactions';
 import type { Vehicle } from '@/lib/api/vehicles';
 import type { Product } from '@/lib/api/products';
 import type { Service } from '@/lib/api/services';
-import type { Package } from '@/lib/api/packages';
+import type { Package as PackageType } from '@/lib/api/packages';
 import type {
   CreateTransactionItem,
   PaymentMethod,
 } from '@/lib/api/transactions';
 import { formatRupiah } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 type ItemTab = 'PRODUCT' | 'SERVICE' | 'PACKAGE' | 'EXTERNAL';
 
 interface CartItem {
   key: string;
-  item_type: 'PRODUCT' | 'SERVICE' | 'PACKAGE' | 'EXTERNAL';
+  item_type: ItemTab;
   item_id?: number;
   item_name: string;
   base_price: number;
   qty: number;
 }
 
+const TABS: Array<{ value: ItemTab; label: string }> = [
+  { value: 'PRODUCT', label: 'Produk' },
+  { value: 'SERVICE', label: 'Layanan' },
+  { value: 'PACKAGE', label: 'Paket' },
+  { value: 'EXTERNAL', label: 'Lainnya' },
+];
+
+const TYPE_META: Record<ItemTab, { badge: string; Icon: LucideIcon }> = {
+  PRODUCT: { badge: 'PRODUK', Icon: Package },
+  SERVICE: { badge: 'LAYANAN', Icon: Wrench },
+  PACKAGE: { badge: 'PAKET', Icon: PackageOpen },
+  EXTERNAL: { badge: 'LAINNYA', Icon: Tag },
+};
+
+// Order chosen so the first row matches the mockup (Tunai · Transfer · QRIS · Debit)
 const PAYMENT_METHODS: Array<{ value: PaymentMethod; label: string }> = [
   { value: 'CASH', label: 'Tunai' },
-  { value: 'DEBIT', label: 'Debit' },
-  { value: 'CREDIT', label: 'Kredit' },
   { value: 'TRANSFER', label: 'Transfer' },
   { value: 'QRIS', label: 'QRIS' },
+  { value: 'DEBIT', label: 'Debit' },
+  { value: 'CREDIT', label: 'Kredit' },
   { value: 'OTHER', label: 'Lainnya' },
 ];
+
+function ItemCard({
+  Icon,
+  badge,
+  name,
+  price,
+  meta,
+  metaDanger,
+  disabled,
+  onClick,
+}: {
+  Icon: LucideIcon;
+  badge: string;
+  name: string;
+  price: string;
+  meta?: string;
+  metaDanger?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="group text-left rounded-xl border bg-white p-3 flex flex-col gap-2 transition-all hover:border-slate-300 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:hover:border-slate-200"
+    >
+      <div className="flex items-start justify-between">
+        <div
+          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: 'var(--navy-50)' }}
+        >
+          <Icon className="h-[18px] w-[18px]" style={{ color: 'var(--navy-700)' }} />
+        </div>
+        <span className="text-[9.5px] font-bold uppercase tracking-[0.06em] px-1.5 py-0.5 rounded text-slate-400 bg-slate-100">
+          {badge}
+        </span>
+      </div>
+      <p
+        className="text-[13px] font-[550] leading-tight overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] min-h-[34px]"
+        style={{ color: 'var(--navy-900)' }}
+      >
+        {name}
+      </p>
+      <div className="flex items-end justify-between gap-2 mt-auto">
+        <span
+          className="text-[13.5px] font-[650]"
+          style={{
+            fontFamily: 'ui-monospace, monospace',
+            color: 'var(--navy-900)',
+          }}
+        >
+          {price}
+        </span>
+        {meta && (
+          <span
+            className={cn(
+              'text-[10.5px] flex-shrink-0',
+              metaDanger ? 'text-orange-600 font-[550]' : 'text-slate-400'
+            )}
+          >
+            {meta}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
 
 export default function PosPage() {
   const router = useRouter();
 
   // Selections
-  const [vehicleSearch, setVehicleSearch] = useState('');
-  const [vehicleDropOpen, setVehicleDropOpen] = useState(false);
+  const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [selectedMechanicId, setSelectedMechanicId] = useState<number | ''>('');
   const [currentKm, setCurrentKm] = useState('');
@@ -83,9 +177,7 @@ export default function PosPage() {
   const [successTrxId, setSuccessTrxId] = useState<number | null>(null);
 
   // API
-  const { data: vehicles, isLoading: vehiclesLoading } = useVehicles(
-    vehicleSearch || undefined
-  );
+  const { data: vehicles, isLoading: vehiclesLoading } = useVehicles();
   const { data: mechanics } = useMechanics();
   const { data: productsData } = useProducts(
     activeTab === 'PRODUCT' ? { search: itemSearch || undefined } : undefined
@@ -140,6 +232,22 @@ export default function PosPage() {
     setCart(prev => prev.filter(c => c.key !== key));
   }
 
+  function clearCart() {
+    setCart([]);
+  }
+
+  function selectVehicle(v: Vehicle) {
+    setSelectedVehicle(v);
+    setCurrentKm(String(v.current_km));
+    setVehicleModalOpen(false);
+  }
+
+  function clearVehicle() {
+    setSelectedVehicle(null);
+    setCurrentKm('');
+    setSelectedMechanicId('');
+  }
+
   function addExternal() {
     if (!extName || !extPrice) return;
     addToCart({
@@ -189,6 +297,13 @@ export default function PosPage() {
 
   const activeMechanics = mechanics?.filter(m => m.is_active) ?? [];
 
+  const searchPlaceholder =
+    activeTab === 'PRODUCT'
+      ? 'Cari produk / sparepart…'
+      : activeTab === 'SERVICE'
+      ? 'Cari layanan…'
+      : 'Cari paket…';
+
   if (successTrxId !== null) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-5">
@@ -229,9 +344,7 @@ export default function PosPage() {
             onClick={() => {
               setSuccessTrxId(null);
               setCart([]);
-              setSelectedVehicle(null);
-              setSelectedMechanicId('');
-              setCurrentKm('');
+              clearVehicle();
               setDiscount('');
               setNotes('');
               setPaymentAmount('');
@@ -246,224 +359,81 @@ export default function PosPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1
-          className="text-[22px] font-[650] tracking-[-0.02em]"
-          style={{ color: 'var(--navy-900)' }}
-        >
-          Transaksi Baru
-        </h1>
-        <p className="text-[13px] text-slate-500 mt-0.5">
-          Buat servis atau penjualan
-        </p>
+    <div className="space-y-4">
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <p className="text-[11.5px] text-slate-400 font-[550]">
+            Kasir / Point of Sale
+          </p>
+          <h1
+            className="text-[22px] font-[650] tracking-[-0.02em] mt-0.5"
+            style={{ color: 'var(--navy-900)' }}
+          >
+            Transaksi Baru
+          </h1>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 p-1 rounded-[10px] bg-slate-100 w-fit">
+          {TABS.map(tab => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => {
+                setActiveTab(tab.value);
+                setItemSearch('');
+              }}
+              className="px-3.5 h-8 rounded-[8px] text-[12.5px] font-[550] transition-all"
+              style={
+                activeTab === tab.value
+                  ? { background: 'var(--navy-800)', color: '#fff' }
+                  : { background: 'transparent', color: '#64748b' }
+              }
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-5">
-        {/* ── Left: vehicle + items ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-5 items-start">
+        {/* ── Left: search + catalog ── */}
         <div className="space-y-4">
-          {/* Vehicle & mechanic */}
-          <div className="rounded-xl border bg-white p-4 space-y-3">
-            <p className="text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em]">
-              Kendaraan &amp; Mekanik
-            </p>
-
-            {/* Vehicle search */}
-            <div className="relative">
+          {activeTab !== 'EXTERNAL' ? (
+            <>
+              {/* Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  className="w-full h-10 pl-9 pr-3 rounded-[10px] border border-slate-200 bg-white text-[13.5px] text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-700 focus:ring-2 focus:ring-slate-700/10"
-                  placeholder="Cari kendaraan (plat, merk, model, pemilik)…"
-                  value={vehicleSearch}
-                  onChange={e => {
-                    setVehicleSearch(e.target.value);
-                    setVehicleDropOpen(true);
-                    if (!e.target.value) {
-                      setSelectedVehicle(null);
-                    }
-                  }}
-                  onFocus={() => setVehicleDropOpen(true)}
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  className="pl-10 h-11 rounded-[12px] text-[13.5px]"
+                  placeholder={searchPlaceholder}
+                  value={itemSearch}
+                  onChange={e => setItemSearch(e.target.value)}
                 />
               </div>
 
-              {vehicleDropOpen && vehicleSearch && (
-                <div className="absolute z-20 mt-1 w-full rounded-[10px] border bg-white shadow-lg max-h-56 overflow-y-auto">
-                  {vehiclesLoading ? (
-                    <p className="px-4 py-3 text-[13px] text-slate-400">
-                      Mencari…
-                    </p>
-                  ) : !vehicles || vehicles.length === 0 ? (
-                    <p className="px-4 py-3 text-[13px] text-slate-400">
-                      Tidak ada kendaraan ditemukan
-                    </p>
-                  ) : (
-                    vehicles.map(v => (
-                      <button
-                        key={v.id}
-                        type="button"
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors text-left"
-                        onClick={() => {
-                          setSelectedVehicle(v);
-                          setVehicleSearch(
-                            `${v.license_plate} — ${v.brand} ${v.model}`
-                          );
-                          setCurrentKm(String(v.current_km));
-                          setVehicleDropOpen(false);
-                        }}
-                      >
-                        <span
-                          className="text-[11px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
-                          style={{
-                            background: '#1a1a1a',
-                            color: '#e8d84a',
-                            fontFamily: 'ui-monospace, monospace',
-                          }}
-                        >
-                          {v.license_plate}
-                        </span>
-                        <span>
-                          <p
-                            className="text-[13px] font-[550]"
-                            style={{ color: 'var(--navy-900)' }}
-                          >
-                            {v.brand} {v.model}
-                          </p>
-                          <p className="text-[11px] text-slate-400">
-                            {v.customer?.name}
-                          </p>
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-
-            {selectedVehicle && (
-              <div className="flex items-center gap-3 rounded-[10px] bg-slate-50 border px-3 py-2.5">
-                <Car className="h-4 w-4 text-slate-400 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p
-                    className="text-[12.5px] font-[550] truncate"
-                    style={{ color: 'var(--navy-900)' }}
-                  >
-                    {selectedVehicle.customer?.name}
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    {selectedVehicle.brand} {selectedVehicle.model}
-                  </p>
-                </div>
-                <input
-                  type="number"
-                  value={currentKm}
-                  onChange={e => setCurrentKm(e.target.value)}
-                  className="w-28 h-8 px-2 rounded-[8px] border border-slate-200 text-[12.5px] text-right outline-none focus:border-slate-700"
-                  placeholder="KM saat ini"
-                />
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-[11.5px] text-slate-500 uppercase tracking-[0.04em]">
-                  Mekanik
-                </Label>
-                <div className="relative">
-                  <select
-                    value={selectedMechanicId}
-                    onChange={e =>
-                      setSelectedMechanicId(
-                        e.target.value ? Number(e.target.value) : ''
-                      )
-                    }
-                    className="w-full h-10 appearance-none border border-slate-200 rounded-[10px] px-3 pr-8 text-[13.5px] bg-white outline-none focus:border-slate-700"
-                  >
-                    <option value="">Pilih mekanik (opsional)</option>
-                    {activeMechanics.map(m => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[11.5px] text-slate-500 uppercase tracking-[0.04em]">
-                  Catatan
-                </Label>
-                <input
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                  className="w-full h-10 px-3 rounded-[10px] border border-slate-200 text-[13.5px] outline-none focus:border-slate-700"
-                  placeholder="Keluhan, instruksi…"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Item selector */}
-          <div className="rounded-xl border bg-white p-4 space-y-3">
-            <p className="text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em]">
-              Tambah Item
-            </p>
-
-            {/* Tabs */}
-            <div className="flex gap-1 flex-wrap">
-              {(['PRODUCT', 'SERVICE', 'PACKAGE', 'EXTERNAL'] as ItemTab[]).map(
-                tab => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => {
-                      setActiveTab(tab);
-                      setItemSearch('');
-                    }}
-                    className="px-3 h-8 rounded-[8px] text-[12.5px] font-[550] transition-all"
-                    style={
-                      activeTab === tab
-                        ? { background: 'var(--navy-800)', color: '#fff' }
-                        : { background: '#f1f5f9', color: '#64748b' }
-                    }
-                  >
-                    {tab === 'PRODUCT'
-                      ? 'Produk'
-                      : tab === 'SERVICE'
-                      ? 'Jasa'
-                      : tab === 'PACKAGE'
-                      ? 'Paket'
-                      : 'Lainnya'}
-                  </button>
-                )
-              )}
-            </div>
-
-            {activeTab !== 'EXTERNAL' ? (
-              <>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input
-                    className="pl-9 h-9"
-                    placeholder={
-                      activeTab === 'PRODUCT'
-                        ? 'Cari produk…'
-                        : activeTab === 'SERVICE'
-                        ? 'Cari jasa…'
-                        : 'Cari paket…'
-                    }
-                    value={itemSearch}
-                    onChange={e => setItemSearch(e.target.value)}
-                  />
-                </div>
-
-                <div className="max-h-52 overflow-y-auto divide-y rounded-[10px] border">
-                  {activeTab === 'PRODUCT' &&
-                    products.map((p: Product) => (
-                      <button
+              {/* Catalog grid */}
+              <div
+                className="grid gap-3"
+                style={{
+                  gridTemplateColumns:
+                    'repeat(auto-fill, minmax(168px, 1fr))',
+                }}
+              >
+                {activeTab === 'PRODUCT' &&
+                  products.map((p: Product) => {
+                    const out = p.stock <= 0;
+                    return (
+                      <ItemCard
                         key={p.id}
-                        type="button"
-                        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-50 text-left transition-colors"
+                        Icon={TYPE_META.PRODUCT.Icon}
+                        badge={TYPE_META.PRODUCT.badge}
+                        name={p.name}
+                        price={formatRupiah(p.price_sell)}
+                        meta={out ? 'Stok habis' : `Stok ${p.stock}`}
+                        metaDanger={out}
+                        disabled={out}
                         onClick={() =>
                           addToCart({
                             item_type: 'PRODUCT',
@@ -472,60 +442,46 @@ export default function PosPage() {
                             base_price: parseFloat(p.price_sell),
                           })
                         }
-                      >
-                        <div>
-                          <p className="text-[13px] font-[500]">{p.name}</p>
-                          <p className="text-[11px] text-slate-400">
-                            {p.sku} · stok {p.stock}
-                          </p>
-                        </div>
-                        <span
-                          className="text-[12.5px] font-[600] flex-shrink-0 ml-3"
-                          style={{
-                            fontFamily: 'ui-monospace, monospace',
-                            color: 'var(--navy-900)',
-                          }}
-                        >
-                          {formatRupiah(p.price_sell)}
-                        </span>
-                      </button>
-                    ))}
+                      />
+                    );
+                  })}
 
-                  {activeTab === 'SERVICE' &&
-                    filteredServices.map((s: Service) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-50 text-left transition-colors"
-                        onClick={() =>
-                          addToCart({
-                            item_type: 'SERVICE',
-                            item_id: s.id,
-                            item_name: s.name,
-                            base_price: parseFloat(s.price),
-                          })
-                        }
-                      >
-                        <p className="text-[13px] font-[500]">{s.name}</p>
-                        <span
-                          className="text-[12.5px] font-[600] flex-shrink-0 ml-3"
-                          style={{
-                            fontFamily: 'ui-monospace, monospace',
-                            color: 'var(--navy-900)',
-                          }}
-                        >
-                          {formatRupiah(s.price)}
-                        </span>
-                      </button>
-                    ))}
+                {activeTab === 'SERVICE' &&
+                  filteredServices.map((s: Service) => (
+                    <ItemCard
+                      key={s.id}
+                      Icon={TYPE_META.SERVICE.Icon}
+                      badge={TYPE_META.SERVICE.badge}
+                      name={s.name}
+                      price={formatRupiah(s.price)}
+                      onClick={() =>
+                        addToCart({
+                          item_type: 'SERVICE',
+                          item_id: s.id,
+                          item_name: s.name,
+                          base_price: parseFloat(s.price),
+                        })
+                      }
+                    />
+                  ))}
 
-                  {activeTab === 'PACKAGE' &&
-                    packages.map((pkg: Package) => (
-                      <button
+                {activeTab === 'PACKAGE' &&
+                  packages.map((pkg: PackageType) => {
+                    const unavailable = !pkg.calculated.is_available;
+                    return (
+                      <ItemCard
                         key={pkg.id}
-                        type="button"
-                        disabled={!pkg.calculated.is_available}
-                        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-50 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        Icon={TYPE_META.PACKAGE.Icon}
+                        badge={TYPE_META.PACKAGE.badge}
+                        name={pkg.name}
+                        price={formatRupiah(pkg.price)}
+                        meta={
+                          unavailable
+                            ? 'Stok kurang'
+                            : `${pkg.items.length} komponen`
+                        }
+                        metaDanger={unavailable}
+                        disabled={unavailable}
                         onClick={() =>
                           addToCart({
                             item_type: 'PACKAGE',
@@ -534,270 +490,489 @@ export default function PosPage() {
                             base_price: parseFloat(pkg.price),
                           })
                         }
-                      >
-                        <div>
-                          <p className="text-[13px] font-[500]">{pkg.name}</p>
-                          <p className="text-[11px] text-slate-400">
-                            {pkg.items.length} komponen
-                            {!pkg.calculated.is_available && (
-                              <span className="text-red-500 ml-1">
-                                · Stok kurang
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                        <span
-                          className="text-[12.5px] font-[600] flex-shrink-0 ml-3"
-                          style={{
-                            fontFamily: 'ui-monospace, monospace',
-                            color: 'var(--navy-900)',
-                          }}
-                        >
-                          {formatRupiah(pkg.price)}
-                        </span>
-                      </button>
-                    ))}
+                      />
+                    );
+                  })}
 
-                  {(activeTab === 'PRODUCT' && products.length === 0) ||
-                  (activeTab === 'SERVICE' && filteredServices.length === 0) ||
-                  (activeTab === 'PACKAGE' && packages.length === 0) ? (
-                    <p className="px-3 py-4 text-[13px] text-slate-400 text-center">
+                {((activeTab === 'PRODUCT' && products.length === 0) ||
+                  (activeTab === 'SERVICE' &&
+                    filteredServices.length === 0) ||
+                  (activeTab === 'PACKAGE' && packages.length === 0)) && (
+                  <div className="col-span-full py-12 text-center">
+                    <Package className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                    <p className="text-[13px] text-slate-400">
                       Tidak ada hasil
                     </p>
-                  ) : null}
-                </div>
-              </>
-            ) : (
-              <div className="flex gap-2">
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            /* External / custom item form */
+            <div className="rounded-xl border bg-white p-4 space-y-3">
+              <p className="text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em]">
+                Item Custom / Non-katalog
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   value={extName}
                   onChange={e => setExtName(e.target.value)}
-                  className="flex-1 h-10 px-3 rounded-[10px] border border-slate-200 text-[13.5px] outline-none focus:border-slate-700"
-                  placeholder="Nama item"
+                  className="flex-1 h-11 px-3 rounded-[12px] border border-slate-200 text-[13.5px] outline-none focus:border-slate-700"
+                  placeholder="Nama item (mis. jasa las, sparepart luar)"
                 />
                 <input
                   type="number"
                   value={extPrice}
                   onChange={e => setExtPrice(e.target.value)}
-                  className="w-32 h-10 px-3 rounded-[10px] border border-slate-200 text-[13.5px] outline-none focus:border-slate-700"
+                  className="w-full sm:w-40 h-11 px-3 rounded-[12px] border border-slate-200 text-[13.5px] outline-none focus:border-slate-700"
                   placeholder="Harga"
                 />
                 <Button
                   type="button"
                   onClick={addExternal}
+                  disabled={!extName || !extPrice}
                   style={{ background: 'var(--navy-800)' }}
-                  className="text-white hover:opacity-90 flex-shrink-0"
+                  className="h-11 text-white hover:opacity-90 flex-shrink-0"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Tambah
                 </Button>
               </div>
-            )}
-          </div>
-
-          {/* Cart */}
-          {cart.length > 0 && (
-            <div className="rounded-xl border bg-white overflow-hidden">
-              <div
-                className="px-4 py-2.5 border-b text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em]"
-                style={{ background: '#fafafa' }}
-              >
-                Keranjang ({cart.length} item)
-              </div>
-              <div className="divide-y">
-                {cart.map(item => (
-                  <div
-                    key={item.key}
-                    className="flex items-center gap-3 px-4 py-3"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className="text-[13px] font-[550] truncate"
-                        style={{ color: 'var(--navy-900)' }}
-                      >
-                        {item.item_name}
-                      </p>
-                      <p
-                        className="text-[11.5px] text-slate-400"
-                        style={{ fontFamily: 'ui-monospace, monospace' }}
-                      >
-                        {formatRupiah(String(item.base_price))} × {item.qty} ={' '}
-                        {formatRupiah(String(item.base_price * item.qty))}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => updateQty(item.key, -1)}
-                        className="w-7 h-7 rounded-full border flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
-                      >
-                        <Minus className="h-3 w-3" />
-                      </button>
-                      <span
-                        className="w-6 text-center text-[13px] font-[550]"
-                        style={{ color: 'var(--navy-900)' }}
-                      >
-                        {item.qty}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => updateQty(item.key, 1)}
-                        className="w-7 h-7 rounded-full border flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeFromCart(item.key)}
-                      className="text-red-400 hover:text-red-600 transition-colors ml-1"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+              <p className="text-[11.5px] text-slate-400">
+                Item ini tidak memotong stok dan tidak terhubung ke katalog.
+              </p>
             </div>
           )}
         </div>
 
-        {/* ── Right: summary + payment ── */}
-        <div className="space-y-4">
-          <div className="rounded-xl border bg-white p-4 space-y-3 lg:sticky lg:top-4">
-            <p className="text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em]">
-              Ringkasan &amp; Pembayaran
-            </p>
+        {/* ── Right: order panel ── */}
+        <div className="rounded-xl border bg-white lg:sticky lg:top-4 overflow-hidden">
+          {/* Panel header */}
+          <div className="flex items-center justify-between px-4 h-12 border-b">
+            <div className="flex items-center gap-2">
+              <ShoppingCart
+                className="h-4 w-4"
+                style={{ color: 'var(--navy-700)' }}
+              />
+              <span
+                className="text-[14px] font-[600]"
+                style={{ color: 'var(--navy-900)' }}
+              >
+                Pesanan
+              </span>
+              {cart.length > 0 && (
+                <span
+                  className="text-[11px] font-bold px-1.5 py-0.5 rounded-full text-white"
+                  style={{ background: 'var(--navy-800)' }}
+                >
+                  {cart.length}
+                </span>
+              )}
+            </div>
+            {cart.length > 0 && (
+              <button
+                type="button"
+                onClick={clearCart}
+                className="text-[12px] font-[550] text-red-500 hover:text-red-600 transition-colors"
+              >
+                Kosongkan
+              </button>
+            )}
+          </div>
 
-            {cart.length === 0 ? (
-              <div className="py-8 text-center">
-                <ShoppingCart className="h-8 w-8 mx-auto mb-2 text-slate-300" />
-                <p className="text-[12.5px] text-slate-400">Keranjang kosong</p>
-              </div>
-            ) : (
-              <>
-                {/* Subtotal */}
-                <div className="space-y-1.5 text-[12.5px]">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Subtotal</span>
-                    <span style={{ fontFamily: 'ui-monospace, monospace' }}>
-                      {formatRupiah(String(subtotal))}
-                    </span>
-                  </div>
+          <div className="p-4 space-y-3">
+            {/* Vehicle / customer */}
+            <div className="space-y-2">
+              <Label className="text-[11px] text-slate-500 uppercase tracking-[0.05em]">
+                Kendaraan / Pelanggan
+              </Label>
 
-                  {/* Discount */}
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-slate-600 flex-shrink-0">Diskon</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={discount}
-                      onChange={e => setDiscount(e.target.value)}
-                      className="w-28 h-8 px-2 rounded-[8px] border border-slate-200 text-[12.5px] text-right outline-none focus:border-slate-700"
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div
-                    className="flex justify-between font-[650] text-[15px] pt-1.5 border-t"
-                    style={{ color: 'var(--navy-900)' }}
+              {!selectedVehicle ? (
+                <button
+                  type="button"
+                  onClick={() => setVehicleModalOpen(true)}
+                  className="w-full flex items-center justify-between rounded-[10px] border border-slate-200 px-3 h-11 text-left hover:border-slate-300 transition-colors"
+                >
+                  <span className="flex items-center gap-2 text-[13px] text-slate-500">
+                    <Car className="h-4 w-4 text-slate-400" />
+                    Walk-in (Tanpa Kendaraan)
+                  </span>
+                  <span
+                    className="text-[12px] font-[600]"
+                    style={{ color: 'var(--navy-800)' }}
                   >
-                    <span>Total</span>
-                    <span style={{ fontFamily: 'ui-monospace, monospace' }}>
-                      {formatRupiah(String(total))}
+                    Pilih
+                  </span>
+                </button>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2.5 rounded-[10px] bg-slate-50 border px-3 py-2.5">
+                    <span
+                      className="text-[11px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                      style={{
+                        background: '#1a1a1a',
+                        color: '#e8d84a',
+                        fontFamily: 'ui-monospace, monospace',
+                      }}
+                    >
+                      {selectedVehicle.license_plate}
                     </span>
-                  </div>
-                </div>
-
-                <div className="border-t pt-3 space-y-3">
-                  {/* Payment method */}
-                  <div className="space-y-1">
-                    <Label className="text-[11.5px] text-slate-500 uppercase tracking-[0.04em]">
-                      Metode Bayar
-                    </Label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {PAYMENT_METHODS.map(m => (
-                        <button
-                          key={m.value}
-                          type="button"
-                          onClick={() => setPaymentMethod(m.value)}
-                          className="h-8 rounded-[8px] text-[12px] font-[550] border transition-all"
-                          style={
-                            paymentMethod === m.value
-                              ? {
-                                  background: 'var(--navy-800)',
-                                  color: '#fff',
-                                  borderColor: 'var(--navy-800)',
-                                }
-                              : {
-                                  background: '#fff',
-                                  color: '#64748b',
-                                  borderColor: '#e2e8f0',
-                                }
-                          }
-                        >
-                          {m.label}
-                        </button>
-                      ))}
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="text-[12.5px] font-[550] truncate"
+                        style={{ color: 'var(--navy-900)' }}
+                      >
+                        {selectedVehicle.customer?.name ?? 'Tanpa pelanggan'}
+                      </p>
+                      <p className="text-[11px] text-slate-500 truncate">
+                        {selectedVehicle.brand} {selectedVehicle.model}
+                      </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setVehicleModalOpen(true)}
+                      className="text-[11.5px] font-[550] text-slate-500 hover:text-slate-700 transition-colors flex-shrink-0 px-1"
+                      title="Ganti kendaraan"
+                    >
+                      Ganti
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearVehicle}
+                      className="text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+                      title="Ganti ke walk-in"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
 
-                  {/* Payment amount */}
-                  <div className="space-y-1">
-                    <Label className="text-[11.5px] text-slate-500 uppercase tracking-[0.04em]">
-                      Jumlah Bayar
-                    </Label>
-                    <input
-                      type="number"
-                      value={paymentAmount}
-                      onChange={e => setPaymentAmount(e.target.value)}
-                      className="w-full h-10 px-3 rounded-[10px] border border-slate-200 text-[13.5px] outline-none focus:border-slate-700"
-                      placeholder={String(total)}
-                    />
-                  </div>
-
-                  {paymentMethod !== 'CASH' && (
-                    <div className="space-y-1">
-                      <Label className="text-[11.5px] text-slate-500 uppercase tracking-[0.04em]">
-                        No. Referensi
-                      </Label>
+                  {/* Mechanic + KM only when a vehicle is selected */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="relative">
+                      <select
+                        value={selectedMechanicId}
+                        onChange={e =>
+                          setSelectedMechanicId(
+                            e.target.value ? Number(e.target.value) : ''
+                          )
+                        }
+                        className="w-full h-10 appearance-none border border-slate-200 rounded-[10px] px-3 pr-8 text-[12.5px] bg-white outline-none focus:border-slate-700"
+                      >
+                        <option value="">Mekanik…</option>
+                        {activeMechanics.map(m => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                    </div>
+                    <div className="relative">
+                      <Car className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                       <input
-                        value={refNumber}
-                        onChange={e => setRefNumber(e.target.value)}
-                        className="w-full h-10 px-3 rounded-[10px] border border-slate-200 text-[13.5px] outline-none focus:border-slate-700"
-                        placeholder="Opsional"
+                        type="number"
+                        value={currentKm}
+                        onChange={e => setCurrentKm(e.target.value)}
+                        className="w-full h-10 pl-8 pr-2 rounded-[10px] border border-slate-200 text-[12.5px] text-right outline-none focus:border-slate-700"
+                        placeholder="KM"
                       />
                     </div>
-                  )}
+                  </div>
+                </>
+              )}
+            </div>
 
-                  {paymentMethod === 'CASH' && change > 0 && (
-                    <div className="rounded-[10px] bg-green-50 border border-green-200 px-3 py-2 flex justify-between">
-                      <span className="text-[12.5px] text-green-700 font-[550]">
-                        Kembalian
-                      </span>
-                      <span
-                        className="text-[12.5px] font-[650] text-green-700"
-                        style={{ fontFamily: 'ui-monospace, monospace' }}
+            {/* Cart items */}
+            {cart.length === 0 ? (
+              <div className="py-10 text-center border-y">
+                <ShoppingCart className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                <p className="text-[12.5px] text-slate-400">
+                  Keranjang kosong
+                </p>
+                <p className="text-[11px] text-slate-300 mt-0.5">
+                  Pilih item dari katalog
+                </p>
+              </div>
+            ) : (
+              <div className="border-y divide-y max-h-[38vh] overflow-y-auto -mx-1 px-1">
+                {cart.map(item => (
+                  <div key={item.key} className="flex items-center gap-2 py-2.5">
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="text-[12.5px] font-[550] truncate"
+                        style={{ color: 'var(--navy-900)' }}
                       >
-                        {formatRupiah(String(change))}
-                      </span>
+                        {item.item_name}
+                      </p>
+                      <p className="text-[10.5px] text-slate-400">
+                        <span className="uppercase tracking-[0.04em]">
+                          {TYPE_META[item.item_type].badge}
+                        </span>{' '}
+                        ·{' '}
+                        <span style={{ fontFamily: 'ui-monospace, monospace' }}>
+                          {formatRupiah(item.base_price)}
+                        </span>
+                      </p>
                     </div>
-                  )}
-                </div>
-
-                <Button
-                  className="w-full h-11 text-[14px] font-[550] text-white"
-                  style={{ background: 'var(--orange-500)' }}
-                  disabled={cart.length === 0 || createTrx.isPending}
-                  onClick={handleSubmit}
-                >
-                  {createTrx.isPending
-                    ? 'Memproses…'
-                    : `Proses Transaksi · ${formatRupiah(String(total))}`}
-                </Button>
-              </>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span
+                        className="text-[12.5px] font-[600]"
+                        style={{
+                          fontFamily: 'ui-monospace, monospace',
+                          color: 'var(--navy-900)',
+                        }}
+                      >
+                        {formatRupiah(item.base_price * item.qty)}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            item.qty === 1
+                              ? removeFromCart(item.key)
+                              : updateQty(item.key, -1)
+                          }
+                          className="w-6 h-6 rounded-md border flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <span
+                          className="w-6 text-center text-[12.5px] font-[550]"
+                          style={{ color: 'var(--navy-900)' }}
+                        >
+                          {item.qty}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateQty(item.key, 1)}
+                          className="w-6 h-6 rounded-md border flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
+
+            {/* Notes */}
+            <div className="space-y-1">
+              <Label className="text-[11px] text-slate-500 uppercase tracking-[0.05em]">
+                Catatan
+              </Label>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 rounded-[10px] border border-slate-200 text-[13px] outline-none focus:border-slate-700 resize-none"
+                placeholder="cth. Service berkala 50.000 KM"
+              />
+            </div>
+
+            {/* Payment method */}
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-slate-500 uppercase tracking-[0.05em]">
+                Metode Bayar
+              </Label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {PAYMENT_METHODS.map(m => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setPaymentMethod(m.value)}
+                    className="h-9 rounded-[8px] text-[12px] font-[550] border transition-all"
+                    style={
+                      paymentMethod === m.value
+                        ? {
+                            background: 'var(--navy-800)',
+                            color: '#fff',
+                            borderColor: 'var(--navy-800)',
+                          }
+                        : {
+                            background: '#fff',
+                            color: '#64748b',
+                            borderColor: '#e2e8f0',
+                          }
+                    }
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Payment amount */}
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-slate-500 uppercase tracking-[0.05em]">
+                Jumlah Bayar
+              </Label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={paymentAmount}
+                  onChange={e => setPaymentAmount(e.target.value)}
+                  className="flex-1 h-10 px-3 rounded-[10px] border border-slate-200 text-[13.5px] outline-none focus:border-slate-700"
+                  placeholder={String(total)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setPaymentAmount(String(total))}
+                  disabled={total <= 0}
+                  className="px-3 h-10 rounded-[10px] border text-[12.5px] font-[550] text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 flex-shrink-0"
+                >
+                  Uang Pas
+                </button>
+              </div>
+            </div>
+
+            {paymentMethod !== 'CASH' && (
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-slate-500 uppercase tracking-[0.05em]">
+                  No. Referensi
+                </Label>
+                <input
+                  value={refNumber}
+                  onChange={e => setRefNumber(e.target.value)}
+                  className="w-full h-10 px-3 rounded-[10px] border border-slate-200 text-[13.5px] outline-none focus:border-slate-700"
+                  placeholder="Opsional"
+                />
+              </div>
+            )}
+
+            {paymentMethod === 'CASH' && change > 0 && (
+              <div className="rounded-[10px] bg-green-50 border border-green-200 px-3 py-2 flex justify-between">
+                <span className="text-[12.5px] text-green-700 font-[550]">
+                  Kembalian
+                </span>
+                <span
+                  className="text-[12.5px] font-[650] text-green-700"
+                  style={{ fontFamily: 'ui-monospace, monospace' }}
+                >
+                  {formatRupiah(change)}
+                </span>
+              </div>
+            )}
+
+            {/* Totals */}
+            <div className="space-y-1.5 text-[12.5px] border-t pt-3">
+              <div className="flex justify-between text-slate-600">
+                <span>Subtotal</span>
+                <span style={{ fontFamily: 'ui-monospace, monospace' }}>
+                  {formatRupiah(subtotal)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-slate-600 flex-shrink-0">Diskon</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={discount}
+                  onChange={e => setDiscount(e.target.value)}
+                  className="w-28 h-8 px-2 rounded-[8px] border border-slate-200 text-[12.5px] text-right outline-none focus:border-slate-700"
+                  placeholder="0"
+                />
+              </div>
+              <div
+                className="flex justify-between font-[650] text-[15px] pt-1.5 border-t"
+                style={{ color: 'var(--navy-900)' }}
+              >
+                <span>Total</span>
+                <span style={{ fontFamily: 'ui-monospace, monospace' }}>
+                  {formatRupiah(total)}
+                </span>
+              </div>
+            </div>
+
+            {/* Submit */}
+            <Button
+              className="w-full h-12 text-[14px] font-[600] text-white"
+              style={{ background: 'var(--navy-900)' }}
+              disabled={cart.length === 0 || createTrx.isPending}
+              onClick={handleSubmit}
+            >
+              {createTrx.isPending ? (
+                'Memproses…'
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Proses Transaksi · {formatRupiah(total)}
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </div>
+
+      {/* Vehicle picker modal */}
+      <Dialog open={vehicleModalOpen} onOpenChange={setVehicleModalOpen}>
+        <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-5 pt-5 pb-3 border-b">
+            <DialogTitle
+              className="text-[16px]"
+              style={{ color: 'var(--navy-900)' }}
+            >
+              Pilih Kendaraan
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[55vh] overflow-y-auto divide-y">
+            {vehiclesLoading ? (
+              <p className="px-5 py-6 text-[13px] text-slate-400 text-center">
+                Memuat…
+              </p>
+            ) : !vehicles || vehicles.length === 0 ? (
+              <p className="px-5 py-6 text-[13px] text-slate-400 text-center">
+                Belum ada kendaraan terdaftar
+              </p>
+            ) : (
+              vehicles.map(v => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => selectVehicle(v)}
+                  className="w-full flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors text-left"
+                >
+                  <span
+                    className="text-[11px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                    style={{
+                      background: '#1a1a1a',
+                      color: '#e8d84a',
+                      fontFamily: 'ui-monospace, monospace',
+                    }}
+                  >
+                    {v.license_plate}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="text-[13px] font-[550] truncate"
+                      style={{ color: 'var(--navy-900)' }}
+                    >
+                      {v.brand} {v.model}
+                    </p>
+                    <p className="text-[11.5px] text-slate-400 truncate">
+                      {v.customer?.name ?? 'Tanpa pelanggan'}
+                    </p>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+          <div className="p-3 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                clearVehicle();
+                setVehicleModalOpen(false);
+              }}
+            >
+              <Car className="h-4 w-4 mr-2 text-slate-400" />
+              Walk-in / tanpa kendaraan
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

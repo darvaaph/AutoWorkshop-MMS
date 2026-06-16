@@ -184,6 +184,7 @@ class InventoryService {
         // Create inventory log
         const log = await InventoryLog.create({
             product_id,
+            user_id,
             type: 'IN',
             qty,
             stock_before: stockBefore,
