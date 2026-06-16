@@ -11,15 +11,19 @@ AuditLog.init({
   },
   user_id: {
     type: DataTypes.INTEGER,
-    allowNull: false,
+    allowNull: true,
   },
   action: {
-    type: DataTypes.ENUM('CREATE', 'READ', 'UPDATE', 'DELETE'),
+    type: DataTypes.STRING(50),
     allowNull: false,
   },
   table_name: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(100),
     allowNull: false,
+  },
+  record_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
   },
   old_values: {
     type: DataTypes.JSON,

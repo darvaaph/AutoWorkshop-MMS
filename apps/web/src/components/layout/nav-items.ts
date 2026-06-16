@@ -12,6 +12,7 @@ import {
   DollarSign,
   ClipboardList,
   UserCog,
+  ScrollText,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UserRole } from '@/types/auth.types';
@@ -108,6 +109,13 @@ export const navItems: NavItem[] = [
     label: 'Laporan',
     href: '/dashboard/reports',
     icon: BarChart3,
+    roles: ['ADMIN'],
+    section: 'Manajemen',
+  },
+  {
+    label: 'Audit Log',
+    href: '/dashboard/audit-logs',
+    icon: ScrollText,
     roles: ['ADMIN'],
     section: 'Manajemen',
   },

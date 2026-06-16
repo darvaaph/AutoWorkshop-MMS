@@ -10,8 +10,20 @@ const auditService = require('../services/audit.service');
 // Get all customers
 exports.getAllCustomers = async (req, res) => {
     try {
+        const { search } = req.query;
+        const where = search
+            ? {
+                [Op.or]: [
+                    { name: { [Op.like]: `%${search}%` } },
+                    { phone: { [Op.like]: `%${search}%` } },
+                ],
+            }
+            : undefined;
+
         const customers = await Customer.findAll({
-            attributes: ['id', 'name', 'phone', 'address', 'photo_url', 'createdAt', 'updatedAt']
+            where,
+            attributes: ['id', 'name', 'phone', 'address', 'photo_url', 'createdAt', 'updatedAt'],
+            order: [['name', 'ASC']],
         });
         res.status(200).json({ success: true, data: customers });
     } catch (error) {

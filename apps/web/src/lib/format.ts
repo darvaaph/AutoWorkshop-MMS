@@ -16,11 +16,13 @@ export function formatRupiah(value: number | string): string {
 
 export function formatDate(date: string | null | undefined): string {
   if (!date) return '-';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '-';
   return new Intl.DateTimeFormat('id-ID', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
-  }).format(new Date(date));
+  }).format(d);
 }
 
 export function formatKm(km: number | null | undefined): string {

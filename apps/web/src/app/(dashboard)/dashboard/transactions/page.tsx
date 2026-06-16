@@ -120,14 +120,17 @@ function LicensePlate({ plate }: { plate: string }) {
   );
 }
 
-function formatDate(iso: string) {
+function formatDate(iso: string | null | undefined) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '-';
   return new Intl.DateTimeFormat('id-ID', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(iso));
+  }).format(d);
 }
 
 export default function TransactionsPage() {

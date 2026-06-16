@@ -8,9 +8,12 @@ const fs = require('fs');
 exports.getSettings = async (req, res) => {
     try {
         const settings = await Settings.findOne();
-        return res.status(200).json(settings);
+        if (!settings) {
+            return res.status(404).json({ success: false, message: 'Settings not found' });
+        }
+        return res.status(200).json({ success: true, data: settings });
     } catch (error) {
-        return res.status(500).json({ message: 'Error retrieving settings', error });
+        return res.status(500).json({ success: false, message: 'Error retrieving settings', error });
     }
 };
 
@@ -21,10 +24,9 @@ exports.updateSettings = async (req, res) => {
         const settings = await Settings.findOne();
 
         if (!settings) {
-            return res.status(404).json({ message: 'Settings not found' });
+            return res.status(404).json({ success: false, message: 'Settings not found' });
         }
 
-        // Update fields if provided
         if (shop_name !== undefined) settings.shop_name = shop_name;
         if (shop_address !== undefined) settings.shop_address = shop_address;
         if (shop_phone !== undefined) settings.shop_phone = shop_phone;
@@ -33,9 +35,9 @@ exports.updateSettings = async (req, res) => {
         if (shop_logo_url !== undefined) settings.shop_logo_url = shop_logo_url;
 
         await settings.save();
-        return res.status(200).json(settings);
+        return res.status(200).json({ success: true, data: settings });
     } catch (error) {
-        return res.status(500).json({ message: 'Error updating settings', error });
+        return res.status(500).json({ success: false, message: 'Error updating settings', error });
     }
 };
 
@@ -82,11 +84,7 @@ exports.uploadLogo = async (req, res) => {
         settings.shop_logo_url = logoUrl;
         await settings.save();
 
-        return res.status(200).json({
-            message: 'Logo uploaded successfully',
-            logo_url: logoUrl,
-            settings: settings
-        });
+        return res.status(200).json({ success: true, data: settings });
     } catch (error) {
         // Delete uploaded file on error
         if (req.file && fs.existsSync(req.file.path)) {

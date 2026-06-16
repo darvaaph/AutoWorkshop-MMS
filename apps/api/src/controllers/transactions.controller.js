@@ -380,8 +380,13 @@ exports.createTransaction = async (req, res) => {
             discount_amount = 0,
             notes,
             items,
-            initial_payment
+            initial_payment,
+            save_as_pending
         } = req.body;
+
+        // "Bon sementara / rawat inap": open bill that stays editable.
+        // Accept JSON boolean true or form-encoded "true".
+        const isPending = save_as_pending === true || save_as_pending === 'true';
 
         const userId = req.user.id;
 
@@ -634,8 +639,10 @@ exports.createTransaction = async (req, res) => {
         // Calculate totals
         const totalAmount = subtotal - parseFloat(discount_amount);
 
-        // Determine initial status
-        let initialStatus = 'UNPAID';
+        // Determine initial status.
+        // Base status is PENDING for an open "bon sementara", otherwise UNPAID.
+        // A payment still upgrades it to PARTIAL/PAID (bill remains editable while PARTIAL).
+        let initialStatus = isPending ? 'PENDING' : 'UNPAID';
         let paidAmount = 0;
         if (initial_payment && initial_payment.amount > 0) {
             paidAmount = parseFloat(initial_payment.amount);
@@ -800,6 +807,444 @@ exports.createTransaction = async (req, res) => {
             message: 'Failed to create transaction',
             error: errorMessage,
             code: error.name || 'TRANSACTION_ERROR'
+        });
+    }
+};
+
+/**
+ * Update items of an open transaction ("bon sementara / rawat inap").
+ * Editable only when status is PENDING / UNPAID / PARTIAL.
+ *
+ * Item contract:
+ *   - Existing item kept/changed -> send { id, qty }  (price is preserved from DB row)
+ *   - New item                   -> send { item_type, item_id?, qty, item_name?, base_price?, custom_price?, discount_amount?, cost_price? }
+ *   - Existing item omitted       -> removed (stock returned)
+ *
+ * Stock is adjusted with TRUE DELTA per product (net = newQty - oldQty); only a
+ * non-zero net produces one stock update + one InventoryLog. PACKAGE items are
+ * immutable here (cannot add/remove/change) to avoid component-reversal drift.
+ *
+ * PUT /api/transactions/:id
+ */
+exports.updateTransaction = async (req, res) => {
+    const t = await sequelize.transaction();
+
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        const { items, discount_amount, notes, mechanic_id, current_km } = req.body;
+
+        // ---- Basic payload validation ----
+        if (!Array.isArray(items) || items.length === 0) {
+            await t.rollback();
+            return res.status(400).json({ success: false, message: 'Transaksi harus memiliki minimal satu item' });
+        }
+        if (items.length > 50) {
+            await t.rollback();
+            return res.status(400).json({ success: false, message: 'Maksimal 50 item per transaksi' });
+        }
+
+        // ---- Load + lock transaction header (race-safe vs addPayment) ----
+        const transaction = await Transaction.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+        if (!transaction) {
+            await t.rollback();
+            return res.status(404).json({ success: false, message: 'Transaksi tidak ditemukan' });
+        }
+
+        const EDITABLE = ['PENDING', 'UNPAID', 'PARTIAL'];
+        if (!EDITABLE.includes(transaction.status)) {
+            await t.rollback();
+            return res.status(400).json({
+                success: false,
+                message: `Transaksi berstatus ${transaction.status} tidak dapat diedit (hanya PENDING, UNPAID, atau PARTIAL).`
+            });
+        }
+
+        const beforeStatus = transaction.status;
+        const beforeTotal = parseFloat(transaction.total_amount);
+
+        // ---- Load existing items + payments inside the lock ----
+        const existingItems = await TransactionItem.findAll({ where: { transaction_id: id }, transaction: t });
+        const payments = await Payment.findAll({ where: { transaction_id: id }, transaction: t });
+        const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+        const existingById = new Map(existingItems.map(it => [it.id, it]));
+
+        // ---- Split incoming items into kept (has id) vs new ----
+        const keptInputs = [];
+        const newInputs = [];
+        for (let i = 0; i < items.length; i++) {
+            const raw = items[i];
+            if (raw === null || typeof raw !== 'object') {
+                await t.rollback();
+                return res.status(400).json({ success: false, message: `Item ke-${i + 1} tidak valid` });
+            }
+            if (raw.id !== undefined && raw.id !== null && raw.id !== '') {
+                const parsedId = parseInt(raw.id, 10);
+                if (!Number.isInteger(parsedId) || parsedId < 1) {
+                    await t.rollback();
+                    return res.status(400).json({ success: false, message: `Item ke-${i + 1}: id tidak valid` });
+                }
+                keptInputs.push({ index: i, id: parsedId, qty: raw.qty });
+            } else {
+                newInputs.push({ index: i, raw });
+            }
+        }
+
+        // ---- Validate kept items belong to this transaction + qty ----
+        const keptIds = new Set();
+        for (const k of keptInputs) {
+            const existing = existingById.get(k.id);
+            if (!existing) {
+                await t.rollback();
+                return res.status(400).json({ success: false, message: `Item dengan id ${k.id} bukan milik transaksi ini` });
+            }
+            if (keptIds.has(k.id)) {
+                await t.rollback();
+                return res.status(400).json({ success: false, message: `Item dengan id ${k.id} terkirim ganda` });
+            }
+            keptIds.add(k.id);
+
+            const qty = parseInt(k.qty, 10);
+            if (!Number.isInteger(qty) || qty < 1) {
+                await t.rollback();
+                return res.status(400).json({ success: false, message: `Qty item "${existing.item_name}" harus bilangan bulat minimal 1` });
+            }
+            k.qtyParsed = qty;
+            k.existing = existing;
+
+            // PACKAGE is immutable: qty must stay the same
+            if (existing.item_type === 'PACKAGE' && qty !== existing.qty) {
+                await t.rollback();
+                return res.status(400).json({ success: false, message: `Qty paket "${existing.item_name}" tidak dapat diubah lewat edit. Batalkan transaksi bila perlu mengubah paket.` });
+            }
+        }
+
+        // ---- PACKAGE immutability: every existing package must be kept ----
+        for (const it of existingItems) {
+            if (it.item_type === 'PACKAGE' && !keptIds.has(it.id)) {
+                await t.rollback();
+                return res.status(400).json({ success: false, message: `Paket "${it.item_name}" tidak dapat dihapus lewat edit. Batalkan transaksi bila perlu.` });
+            }
+        }
+
+        // ---- Process new items (fetch master prices; PACKAGE not allowed) ----
+        const processedNew = [];
+        for (const n of newInputs) {
+            const raw = n.raw;
+            const pos = n.index + 1;
+
+            if (!raw.item_type) {
+                await t.rollback();
+                return res.status(400).json({ success: false, message: `Item ke-${pos}: item_type wajib diisi` });
+            }
+            if (raw.item_type === 'PACKAGE') {
+                await t.rollback();
+                return res.status(400).json({ success: false, message: 'Menambah paket lewat edit belum didukung. Tambahkan produk/jasa satuan.' });
+            }
+            if (!['PRODUCT', 'SERVICE', 'EXTERNAL'].includes(raw.item_type)) {
+                await t.rollback();
+                return res.status(400).json({ success: false, message: `Item ke-${pos}: item_type tidak valid (${raw.item_type})` });
+            }
+
+            const qty = parseInt(raw.qty ?? 1, 10);
+            if (!Number.isInteger(qty) || qty < 1) {
+                await t.rollback();
+                return res.status(400).json({ success: false, message: `Item ke-${pos}: qty harus bilangan bulat minimal 1` });
+            }
+            const discount = parseFloat(raw.discount_amount || 0);
+            if (isNaN(discount) || discount < 0) {
+                await t.rollback();
+                return res.status(400).json({ success: false, message: `Item ke-${pos}: diskon tidak valid` });
+            }
+
+            processedNew.push({ pos, raw, qty, discount });
+        }
+
+        // ---- Bulk fetch + lock products (for new product items AND any product whose qty may change) ----
+        const newProductIds = new Set();
+        const newServiceIds = new Set();
+        for (const p of processedNew) {
+            if (p.raw.item_type === 'PRODUCT') {
+                if (!p.raw.item_id) {
+                    await t.rollback();
+                    return res.status(400).json({ success: false, message: `Item ke-${p.pos}: item_id wajib untuk PRODUCT` });
+                }
+                newProductIds.add(p.raw.item_id);
+            } else if (p.raw.item_type === 'SERVICE') {
+                if (!p.raw.item_id) {
+                    await t.rollback();
+                    return res.status(400).json({ success: false, message: `Item ke-${p.pos}: item_id wajib untuk SERVICE` });
+                }
+                newServiceIds.add(p.raw.item_id);
+            } else if (p.raw.item_type === 'EXTERNAL') {
+                if (!p.raw.item_name || String(p.raw.item_name).trim() === '') {
+                    await t.rollback();
+                    return res.status(400).json({ success: false, message: `Item ke-${p.pos}: item_name wajib untuk EXTERNAL` });
+                }
+            }
+        }
+
+        // Existing standalone PRODUCT item ids (kept or removed) also need their stock rows
+        const existingProductIds = new Set(
+            existingItems.filter(it => it.item_type === 'PRODUCT' && it.item_id).map(it => it.item_id)
+        );
+        const allProductIds = new Set([...existingProductIds, ...newProductIds]);
+
+        const [productRows, serviceRows] = await Promise.all([
+            allProductIds.size > 0
+                ? Product.findAll({ where: { id: Array.from(allProductIds) }, transaction: t, lock: t.LOCK.UPDATE })
+                : [],
+            newServiceIds.size > 0
+                ? Service.findAll({ where: { id: Array.from(newServiceIds) }, transaction: t })
+                : [],
+        ]);
+        const productMap = productRows.reduce((m, p) => { m[p.id] = p; return m; }, {});
+        const serviceMap = serviceRows.reduce((m, s) => { m[s.id] = s; return m; }, {});
+
+        // ---- Build the final list of rows to persist + compute subtotal ----
+        // Kept rows: keep stored price, only qty may change.
+        // New rows: price derived from master data (PRODUCT/SERVICE) or payload (EXTERNAL).
+        const newRowsToCreate = [];
+        let subtotal = 0;
+
+        for (const k of keptInputs) {
+            subtotal += parseFloat(k.existing.sell_price) * k.qtyParsed;
+        }
+
+        for (const p of processedNew) {
+            const { raw, qty, discount } = p;
+            let basePrice = 0, sellPrice = 0, costPrice = 0, itemName = '';
+
+            if (raw.item_type === 'PRODUCT') {
+                const product = productMap[raw.item_id];
+                if (!product) {
+                    await t.rollback();
+                    return res.status(400).json({ success: false, message: `Produk dengan id ${raw.item_id} tidak ditemukan` });
+                }
+                basePrice = parseFloat(product.price_sell);
+                sellPrice = basePrice - discount;
+                costPrice = parseFloat(product.price_buy);
+                itemName = product.name;
+            } else if (raw.item_type === 'SERVICE') {
+                const service = serviceMap[raw.item_id];
+                if (!service) {
+                    await t.rollback();
+                    return res.status(400).json({ success: false, message: `Jasa dengan id ${raw.item_id} tidak ditemukan` });
+                }
+                basePrice = raw.custom_price ? parseFloat(raw.custom_price) : parseFloat(service.price);
+                sellPrice = basePrice - discount;
+                costPrice = 0;
+                itemName = service.name;
+            } else { // EXTERNAL
+                basePrice = parseFloat(raw.base_price || 0);
+                sellPrice = basePrice - discount;
+                costPrice = parseFloat(raw.cost_price || 0);
+                itemName = String(raw.item_name).trim();
+            }
+
+            if (sellPrice < 0) {
+                await t.rollback();
+                return res.status(400).json({ success: false, message: `Item ke-${p.pos}: diskon melebihi harga` });
+            }
+
+            subtotal += sellPrice * qty;
+            newRowsToCreate.push({
+                transaction_id: transaction.id,
+                item_type: raw.item_type,
+                item_id: raw.item_id || 0,
+                item_name: itemName,
+                qty,
+                base_price: basePrice,
+                discount_amount: discount,
+                sell_price: sellPrice,
+                cost_price: costPrice,
+            });
+        }
+
+        // ---- Discount + total ----
+        let discountAmount;
+        if (discount_amount !== undefined && discount_amount !== null && discount_amount !== '') {
+            discountAmount = parseFloat(discount_amount);
+            if (isNaN(discountAmount) || discountAmount < 0) {
+                await t.rollback();
+                return res.status(400).json({ success: false, message: 'Diskon transaksi tidak valid' });
+            }
+        } else {
+            discountAmount = parseFloat(transaction.discount_amount);
+        }
+
+        const totalAmount = subtotal - discountAmount;
+        if (totalAmount < 0) {
+            await t.rollback();
+            return res.status(400).json({ success: false, message: 'Diskon melebihi subtotal' });
+        }
+
+        // ---- Compute product stock delta (PRODUCT items only) ----
+        const oldQtyByProduct = new Map();
+        for (const it of existingItems) {
+            if (it.item_type === 'PRODUCT' && it.item_id) {
+                oldQtyByProduct.set(it.item_id, (oldQtyByProduct.get(it.item_id) || 0) + it.qty);
+            }
+        }
+        const newQtyByProduct = new Map();
+        for (const k of keptInputs) {
+            if (k.existing.item_type === 'PRODUCT' && k.existing.item_id) {
+                newQtyByProduct.set(k.existing.item_id, (newQtyByProduct.get(k.existing.item_id) || 0) + k.qtyParsed);
+            }
+        }
+        for (const p of processedNew) {
+            if (p.raw.item_type === 'PRODUCT') {
+                newQtyByProduct.set(p.raw.item_id, (newQtyByProduct.get(p.raw.item_id) || 0) + p.qty);
+            }
+        }
+
+        // Validate stock availability for net increases BEFORE any write
+        const stockChanges = [];
+        const productIdsUnion = new Set([...oldQtyByProduct.keys(), ...newQtyByProduct.keys()]);
+        for (const pid of productIdsUnion) {
+            const net = (newQtyByProduct.get(pid) || 0) - (oldQtyByProduct.get(pid) || 0);
+            if (net === 0) continue;
+            const product = productMap[pid];
+            if (!product) {
+                await t.rollback();
+                return res.status(400).json({ success: false, message: `Produk id ${pid} tidak ditemukan untuk penyesuaian stok` });
+            }
+            if (net > 0 && product.stock < net) {
+                await t.rollback();
+                return res.status(400).json({
+                    success: false,
+                    message: `Stok "${product.name}" tidak cukup. Tersedia: ${product.stock}, tambahan dibutuhkan: ${net}`
+                });
+            }
+            stockChanges.push({ product, net });
+        }
+
+        // ================= WRITE PHASE (all validations passed) =================
+
+        // 1) Apply stock deltas + inventory logs
+        for (const { product, net } of stockChanges) {
+            const stockBefore = product.stock;
+            const stockAfter = stockBefore - net; // net>0 deducts, net<0 returns
+            await Product.update({ stock: stockAfter }, { where: { id: product.id }, transaction: t });
+            await InventoryLog.create({
+                product_id: product.id,
+                user_id: userId,
+                type: net > 0 ? 'OUT' : 'IN',
+                qty: Math.abs(net),
+                stock_before: stockBefore,
+                stock_after: stockAfter,
+                reference_type: net > 0 ? 'TRANSACTION' : 'RETURN',
+                reference_id: `TRX-${transaction.id}`,
+                notes: net > 0
+                    ? `Edit transaksi #${transaction.id} - tambah qty`
+                    : `Edit transaksi #${transaction.id} - kurangi/hapus item`
+            }, { transaction: t });
+        }
+
+        // 2) Remove items no longer present
+        for (const it of existingItems) {
+            if (!keptIds.has(it.id)) {
+                await it.destroy({ transaction: t });
+            }
+        }
+
+        // 3) Update kept items whose qty changed
+        for (const k of keptInputs) {
+            if (k.qtyParsed !== k.existing.qty) {
+                await k.existing.update({ qty: k.qtyParsed }, { transaction: t });
+            }
+        }
+
+        // 4) Insert new items
+        if (newRowsToCreate.length > 0) {
+            await TransactionItem.bulkCreate(newRowsToCreate, { transaction: t });
+        }
+
+        // 5) Recompute status against existing payments (edit never adds a payment)
+        let newStatus;
+        if (totalPaid <= 0) {
+            newStatus = beforeStatus === 'PENDING' ? 'PENDING' : 'UNPAID';
+        } else if (totalPaid >= totalAmount) {
+            newStatus = 'PAID';
+        } else {
+            newStatus = 'PARTIAL';
+        }
+
+        // 6) Update header (only set optional fields when provided)
+        const headerUpdate = {
+            subtotal,
+            discount_amount: discountAmount,
+            total_amount: totalAmount,
+            status: newStatus,
+        };
+        if (notes !== undefined) headerUpdate.notes = notes || null;
+        if (current_km !== undefined && current_km !== null && current_km !== '') {
+            headerUpdate.current_km = parseInt(current_km, 10) || null;
+        }
+        if (mechanic_id !== undefined && mechanic_id !== null && mechanic_id !== '') {
+            const mechanic = await Mechanic.findOne({ where: { id: mechanic_id, is_active: true }, transaction: t });
+            if (!mechanic) {
+                await t.rollback();
+                return res.status(400).json({ success: false, message: 'Mekanik tidak ditemukan atau tidak aktif' });
+            }
+            headerUpdate.mechanic_id = mechanic_id;
+        }
+        await transaction.update(headerUpdate, { transaction: t });
+
+        await t.commit();
+
+        // ---- Audit (after commit; failure must not roll back the real change) ----
+        try {
+            await auditService.logUpdate(userId, 'transactions', transaction.id,
+                { status: beforeStatus, total_amount: beforeTotal, item_count: existingItems.length },
+                { status: newStatus, total_amount: totalAmount, item_count: keptIds.size + newRowsToCreate.length },
+                req
+            );
+        } catch (auditError) {
+            console.warn('Audit logging failed (updateTransaction):', auditError.message);
+        }
+
+        // ---- Re-fetch complete transaction for response ----
+        const complete = await Transaction.findByPk(transaction.id, {
+            include: [
+                { model: TransactionItem, as: 'items' },
+                { model: Payment, as: 'payments' },
+                { model: Vehicle, as: 'vehicle', include: [{ model: Customer, as: 'customer' }] },
+                { model: Mechanic, as: 'mechanic' },
+                { model: User, as: 'user', attributes: ['id', 'username', 'full_name'] }
+            ]
+        });
+
+        const overpayment = Math.max(0, totalPaid - totalAmount);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Transaksi berhasil diperbarui',
+            data: {
+                transaction: complete,
+                summary: {
+                    subtotal,
+                    discount: discountAmount,
+                    total: totalAmount,
+                    paid: totalPaid,
+                    remaining: Math.max(0, totalAmount - totalPaid),
+                    overpayment,
+                    status: newStatus
+                }
+            }
+        });
+
+    } catch (error) {
+        if (t && !t.finished) {
+            try { await t.rollback(); } catch (rb) { console.error('Rollback error (updateTransaction):', rb); }
+        }
+        console.error('Update transaction error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Gagal memperbarui transaksi',
+            error: error.message,
+            code: error.name || 'TRANSACTION_UPDATE_ERROR'
         });
     }
 };
