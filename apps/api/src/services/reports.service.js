@@ -9,6 +9,10 @@ const Product = require('../models/product.model');
 const Vehicle = require('../models/vehicle.model');
 const Customer = require('../models/customer.model');
 
+// Transactions counted as finalized sales/revenue across all reports & dashboard.
+// Excludes PENDING (bon sementara / rawat inap — not a sale until closed) and CANCELLED.
+const SALE_STATUSES = ['UNPAID', 'PARTIAL', 'PAID'];
+
 class ReportsService {
     /**
      * Generate dashboard summary statistics
@@ -25,26 +29,26 @@ class ReportsService {
         const todayTransactions = await Transaction.count({
             where: {
                 date: { [Op.between]: [today, tomorrow] },
-                status: { [Op.notIn]: ['CANCELLED'] }
+                status: { [Op.in]: SALE_STATUSES }
             }
         });
         const todaySales = (await Transaction.sum('total_amount', {
             where: {
                 date: { [Op.between]: [today, tomorrow] },
-                status: { [Op.notIn]: ['CANCELLED'] }
+                status: { [Op.in]: SALE_STATUSES }
             }
         })) || 0;
 
         const monthlyTransactions = await Transaction.count({
             where: {
                 date: { [Op.between]: [startOfMonth, tomorrow] },
-                status: { [Op.notIn]: ['CANCELLED'] }
+                status: { [Op.in]: SALE_STATUSES }
             }
         });
         const monthlySales = (await Transaction.sum('total_amount', {
             where: {
                 date: { [Op.between]: [startOfMonth, tomorrow] },
-                status: { [Op.notIn]: ['CANCELLED'] }
+                status: { [Op.in]: SALE_STATUSES }
             }
         })) || 0;
 
@@ -82,7 +86,7 @@ class ReportsService {
         }
 
         const transactions = await Transaction.findAll({
-            where: { ...dateFilter, status: { [Op.in]: ['PAID', 'PARTIAL', 'PENDING'] } },
+            where: { ...dateFilter, status: { [Op.in]: SALE_STATUSES } },
             include: [
                 { model: Payment, as: 'payments' },
                 { model: Vehicle, as: 'vehicle', attributes: ['license_plate'] }
@@ -175,7 +179,7 @@ class ReportsService {
     async generateSalesReport(options = {}) {
         const { dateFrom, dateTo } = options;
 
-        const whereClause = { status: { [Op.notIn]: ['CANCELLED'] } };
+        const whereClause = { status: { [Op.in]: SALE_STATUSES } };
         if (dateFrom && dateTo) {
             whereClause.date = { [Op.between]: [new Date(dateFrom), new Date(dateTo + 'T23:59:59')] };
         } else if (dateFrom) {

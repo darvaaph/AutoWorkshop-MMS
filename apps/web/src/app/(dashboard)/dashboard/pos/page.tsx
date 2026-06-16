@@ -281,7 +281,8 @@ export default function PosPage() {
         initial_payment:
           payAmt > 0
             ? {
-                amount: payAmt,
+                // Record only up to the bill total; cash overpayment is change, not revenue.
+                amount: Math.min(payAmt, total),
                 payment_method: paymentMethod,
                 reference_number: refNumber || undefined,
               }

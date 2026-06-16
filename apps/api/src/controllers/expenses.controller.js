@@ -1,5 +1,6 @@
 // expenses.controller.js
 
+const { Op } = require('sequelize');
 const Expense = require('../models/expense.model');
 const auditService = require('../services/audit.service');
 
@@ -16,7 +17,7 @@ exports.createExpense = async (req, res) => {
             category, description, amount, date
         }, req);
         
-        return res.status(201).json(newExpense);
+        return res.status(201).json({ success: true, data: newExpense });
     } catch (error) {
         return res.status(500).json({ message: 'Error creating expense', error: error.message });
     }
@@ -25,8 +26,22 @@ exports.createExpense = async (req, res) => {
 // Get all expenses
 exports.getAllExpenses = async (req, res) => {
     try {
-        const expenses = await Expense.findAll();
-        return res.status(200).json(expenses);
+        const { category, date_from, date_to } = req.query;
+
+        const where = {};
+        if (category) {
+            where.category = category;
+        }
+        if (date_from && date_to) {
+            where.date = { [Op.between]: [new Date(date_from), new Date(date_to + 'T23:59:59')] };
+        } else if (date_from) {
+            where.date = { [Op.gte]: new Date(date_from) };
+        } else if (date_to) {
+            where.date = { [Op.lte]: new Date(date_to + 'T23:59:59') };
+        }
+
+        const expenses = await Expense.findAll({ where, order: [['date', 'DESC']] });
+        return res.status(200).json({ success: true, data: expenses });
     } catch (error) {
         return res.status(500).json({ message: 'Error fetching expenses', error: error.message });
     }
@@ -40,7 +55,7 @@ exports.getExpenseById = async (req, res) => {
         if (!expense) {
             return res.status(404).json({ message: 'Expense not found' });
         }
-        return res.status(200).json(expense);
+        return res.status(200).json({ success: true, data: expense });
     } catch (error) {
         return res.status(500).json({ message: 'Error fetching expense', error: error.message });
     }
@@ -75,7 +90,7 @@ exports.updateExpense = async (req, res) => {
             date: expense.date
         }, req);
         
-        return res.status(200).json(expense);
+        return res.status(200).json({ success: true, data: expense });
     } catch (error) {
         return res.status(500).json({ message: 'Error updating expense', error: error.message });
     }

@@ -9,7 +9,7 @@ export interface Expense {
   description: string;
   amount: string;
   date: string;
-  createdAt: string;
+  created_at: string;
 }
 
 export async function getExpensesApi(params?: {

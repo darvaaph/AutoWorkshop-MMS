@@ -17,32 +17,28 @@ const handleValidationErrors = (req, res, next) => {
         const generalErrors = [];
 
         errors.array().forEach(error => {
-            if (error.path && error.path.includes('.')) {
-                // Handle nested field errors (e.g., items.*.item_type)
-                const pathParts = error.path.split('.');
-                const field = pathParts[0];
-                const subField = pathParts.slice(1).join('.');
+            // express-validator v6 exposes the field name as `param`; v7 uses `path`.
+            const rawPath = error.path || error.param || '';
 
+            if (!rawPath) {
+                generalErrors.push(error.msg);
+                return;
+            }
+
+            // Array item fields arrive as "items[0].qty" (v6) or "items.0.qty" (v7).
+            const arrMatch = rawPath.match(/^(.+?)[.[](\d+)[\]]?(?:\.(.+))?$/);
+            if (arrMatch) {
+                const field = arrMatch[1];
+                const idx = parseInt(arrMatch[2], 10);
                 if (!fieldErrors[field]) {
                     fieldErrors[field] = [];
                 }
-
-                // Add item index for array fields
-                const itemIndex = error.location === 'body' && req.body[field] && Array.isArray(req.body[field])
-                    ? `Item ${parseInt(pathParts[1]) + 1}: `
-                    : '';
-
-                fieldErrors[field].push(`${itemIndex}${error.msg}`);
+                fieldErrors[field].push(`Item ${idx + 1}: ${error.msg}`);
             } else {
-                // Handle general field errors
-                if (error.path) {
-                    if (!fieldErrors[error.path]) {
-                        fieldErrors[error.path] = [];
-                    }
-                    fieldErrors[error.path].push(error.msg);
-                } else {
-                    generalErrors.push(error.msg);
+                if (!fieldErrors[rawPath]) {
+                    fieldErrors[rawPath] = [];
                 }
+                fieldErrors[rawPath].push(error.msg);
             }
         });
 
@@ -132,9 +128,9 @@ const validateCustomer = [
         .notEmpty()
         .withMessage('Nama customer wajib diisi'),
     body('phone')
-        .optional()
+        .optional({ checkFalsy: true })
         .trim()
-        .matches(/^[0-9+\-\s]+$/)
+        .matches(/^[0-9+\-\s().]+$/)
         .withMessage('Format nomor telepon tidak valid'),
     body('address')
         .optional()
@@ -175,35 +171,40 @@ const validateVehicle = [
 
 // ==================== PRODUCT VALIDATORS ====================
 
+// Field names match the create payload AND products.controller self-check:
+// required = name, sku, category, price_buy, price_sell
 const validateProduct = [
     body('name')
         .trim()
         .notEmpty()
         .withMessage('Nama produk wajib diisi'),
     body('sku')
-        .optional()
         .trim()
+        .notEmpty()
+        .withMessage('SKU wajib diisi')
         .toUpperCase(),
     body('category')
-        .optional()
-        .trim(),
-    body('unit')
-        .optional()
         .trim()
-        .default('pcs'),
-    body('sell_price')
+        .notEmpty()
+        .withMessage('Kategori wajib diisi'),
+    body('price_sell')
         .notEmpty()
         .withMessage('Harga jual wajib diisi')
         .isFloat({ min: 0 })
-        .withMessage('Harga jual harus berupa angka positif'),
+        .withMessage('Harga jual harus berupa angka ≥ 0'),
+    body('price_buy')
+        .notEmpty()
+        .withMessage('Harga beli wajib diisi')
+        .isFloat({ min: 0 })
+        .withMessage('Harga beli harus berupa angka ≥ 0'),
     body('stock')
-        .optional()
+        .optional({ checkFalsy: true })
         .isInt({ min: 0 })
-        .withMessage('Stok harus berupa angka positif'),
-    body('min_stock')
-        .optional()
+        .withMessage('Stok harus berupa bilangan bulat ≥ 0'),
+    body('min_stock_alert')
+        .optional({ checkFalsy: true })
         .isInt({ min: 0 })
-        .withMessage('Stok minimum harus berupa angka positif'),
+        .withMessage('Stok minimum harus berupa bilangan bulat ≥ 0'),
 ];
 
 // ==================== SERVICE VALIDATORS ====================
@@ -229,6 +230,8 @@ const validateService = [
 
 // ==================== PACKAGE VALIDATORS ====================
 
+// Item shape matches the create payload AND packages.controller:
+// each item carries product_id OR service_id (at least one) + qty.
 const validatePackage = [
     body('name')
         .trim()
@@ -238,19 +241,26 @@ const validatePackage = [
         .notEmpty()
         .withMessage('Harga paket wajib diisi')
         .isFloat({ min: 0 })
-        .withMessage('Harga paket harus berupa angka positif'),
+        .withMessage('Harga paket harus berupa angka ≥ 0'),
     body('items')
         .isArray({ min: 1 })
         .withMessage('Paket harus memiliki minimal 1 item'),
-    body('items.*.type')
-        .isIn(['PRODUCT', 'SERVICE'])
-        .withMessage('Tipe item harus PRODUCT atau SERVICE'),
-    body('items.*.reference_id')
-        .isInt()
-        .withMessage('Reference ID harus berupa angka'),
-    body('items.*.quantity')
+    body('items.*.qty')
         .isInt({ min: 1 })
-        .withMessage('Quantity harus minimal 1'),
+        .withMessage('Qty item harus minimal 1'),
+    body('items')
+        .custom((items) => {
+            if (!Array.isArray(items)) return true; // isArray rule handles this
+            for (let i = 0; i < items.length; i++) {
+                const it = items[i] || {};
+                const hasProduct = it.product_id !== undefined && it.product_id !== null && it.product_id !== '';
+                const hasService = it.service_id !== undefined && it.service_id !== null && it.service_id !== '';
+                if (!hasProduct && !hasService) {
+                    throw new Error(`Item ${i + 1}: wajib punya product_id atau service_id`);
+                }
+            }
+            return true;
+        }),
 ];
 
 // ==================== MECHANIC VALIDATORS ====================
@@ -465,8 +475,9 @@ const validateExpense = [
         .withMessage('Jumlah wajib diisi')
         .isFloat({ min: 0 })
         .withMessage('Jumlah harus berupa angka positif'),
-    body('expense_date')
-        .optional()
+    body('date')
+        .notEmpty()
+        .withMessage('Tanggal wajib diisi')
         .isISO8601()
         .withMessage('Format tanggal tidak valid'),
 ];
@@ -498,6 +509,29 @@ const validateInventory = [
         .trim(),
 ];
 
+// ==================== STOCK IN VALIDATORS ====================
+// Matches POST /api/inventory/in payload: { product_id, qty, buy_price?, notes? }
+// (validateInventory expects type/quantity and is meant for the generic log endpoint)
+const validateStockIn = [
+    body('product_id')
+        .notEmpty()
+        .withMessage('Product ID wajib diisi')
+        .isInt({ min: 1 })
+        .withMessage('Product ID harus berupa angka positif'),
+    body('qty')
+        .notEmpty()
+        .withMessage('Qty wajib diisi')
+        .isInt({ min: 1 })
+        .withMessage('Qty harus minimal 1'),
+    body('buy_price')
+        .optional({ nullable: true, checkFalsy: true })
+        .isFloat({ min: 0 })
+        .withMessage('Harga beli harus berupa angka positif'),
+    body('notes')
+        .optional({ nullable: true, checkFalsy: true })
+        .trim(),
+];
+
 // ==================== SETTING VALIDATORS ====================
 
 const validateSetting = [
@@ -525,5 +559,6 @@ module.exports = {
     validatePayment,
     validateExpense,
     validateInventory,
+    validateStockIn,
     validateSetting,
 };

@@ -366,8 +366,11 @@ export default function ReportsPage() {
                     <div className="text-[11.5px] text-slate-500" style={{ fontFamily: 'ui-monospace, monospace' }}>
                       {fmtDate(t.date)}
                     </div>
-                    <div className="text-[12.5px] text-slate-600 truncate">
-                      {t.vehicle?.license_plate ?? `#${t.id}`}
+                    <div className="text-[12.5px] truncate">
+                      {t.vehicle?.license_plate
+                        ? <span className="text-slate-700 font-[550]">{t.vehicle.license_plate}</span>
+                        : <span className="text-slate-400 italic">Walk-in</span>
+                      }
                     </div>
                     <div
                       className="text-right text-[12.5px] font-[600]"

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const packagesController = require('../controllers/packages.controller');
 const { verifyToken, requireRole } = require('../middleware/auth.middleware');
-const { validatePackage } = require('../middleware/validation.middleware');
+const { validatePackage, handleValidationErrors } = require('../middleware/validation.middleware');
 const multer = require('multer');
 const path = require('path');
 
@@ -48,7 +48,7 @@ router.get('/:id/check-availability', packagesController.checkPackageAvailabilit
 router.post('/:id/upload-image', verifyToken, requireRole('ADMIN'), upload.single('image'), packagesController.uploadPackageImage);
 
 // Protected routes (Admin only)
-router.post('/', verifyToken, requireRole('ADMIN'), optionalUpload, validatePackage, packagesController.createPackage);
+router.post('/', verifyToken, requireRole('ADMIN'), optionalUpload, validatePackage, handleValidationErrors, packagesController.createPackage);
 router.put('/:id', verifyToken, requireRole('ADMIN'), optionalUpload, packagesController.updatePackage);
 router.delete('/:id', verifyToken, requireRole('ADMIN'), packagesController.deletePackage);
 

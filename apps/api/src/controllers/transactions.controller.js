@@ -120,183 +120,6 @@ const calculateNextServiceReminder = async (vehicleId, currentKm, transactionDat
 };
 
 /**
- * Validate and get item details based on type
- * Returns item info with stock validation
- */
-const getItemDetails = async (itemType, itemId, requestedQty, t) => {
-    let itemData = null;
-    let componentsToDeduct = []; // For package explosion
-
-    switch (itemType) {
-        case 'PRODUCT':
-            const product = await Product.findOne({
-                where: { id: itemId },
-                transaction: t,
-                lock: t.LOCK.UPDATE // Lock row for update
-            });
-
-            if (!product) {
-                return { error: `Product with ID ${itemId} not found` };
-            }
-
-            // Check stock availability
-            if (product.stock < requestedQty) {
-                return { 
-                    error: `Insufficient stock for "${product.name}". Available: ${product.stock}, Requested: ${requestedQty}` 
-                };
-            }
-
-            itemData = {
-                item_name: product.name,
-                base_price: parseFloat(product.price_sell),
-                cost_price: parseFloat(product.price_buy), // HPP for profit calculation
-            };
-
-            componentsToDeduct.push({
-                product_id: product.id,
-                product_name: product.name,
-                qty: requestedQty,
-                current_stock: product.stock
-            });
-            break;
-
-        case 'SERVICE':
-            const service = await Service.findByPk(itemId, { transaction: t });
-
-            if (!service) {
-                return { error: `Service with ID ${itemId} not found` };
-            }
-
-            itemData = {
-                item_name: service.name,
-                base_price: parseFloat(service.price),
-                cost_price: 0, // Services have no COGS
-            };
-            // No stock deduction for services
-            break;
-
-        case 'PACKAGE':
-            const pkg = await Package.findOne({
-                where: { id: itemId, is_active: true },
-                include: [{
-                    model: PackageItem,
-                    as: 'items',
-                    include: [
-                        { model: Product, as: 'product' },
-                        { model: Service, as: 'service' }
-                    ]
-                }],
-                transaction: t
-            });
-
-            if (!pkg) {
-                return { error: `Package with ID ${itemId} not found or inactive` };
-            }
-
-            // Validate stock for all product components in package
-            let totalComponentCost = 0;
-            for (const pkgItem of pkg.items) {
-                if (pkgItem.product_id) {
-                    // This is a product item, check if it's deleted and validate stock
-                    const productCheck = await Product.findByPk(pkgItem.product_id, { 
-                        paranoid: false
-                    });
-                    
-                    if (!productCheck || productCheck.deletedAt !== null) {
-                        // Product has been soft deleted - reject transaction
-                        return { 
-                            error: `Package "${pkg.name}" contains a deleted product and cannot be sold. Please contact administrator to update the package.` 
-                        };
-                    }
-
-                    const requiredQty = pkgItem.qty * requestedQty;
-                    
-                    // Lock product for update using the product_id
-                    const lockedProduct = await Product.findByPk(pkgItem.product_id, {
-                        transaction: t,
-                        lock: t.LOCK.UPDATE
-                    });
-
-                    if (lockedProduct.stock < requiredQty) {
-                        return { 
-                            error: `Insufficient stock for package component "${lockedProduct.name}". Available: ${lockedProduct.stock}, Required: ${requiredQty}` 
-                        };
-                    }
-
-                    componentsToDeduct.push({
-                        product_id: lockedProduct.id,
-                        product_name: lockedProduct.name,
-                        qty: requiredQty,
-                        current_stock: lockedProduct.stock,
-                        is_package_component: true,
-                        package_name: pkg.name
-                    });
-
-                    totalComponentCost += parseFloat(lockedProduct.price_buy) * pkgItem.qty;
-                }
-                // Skip service items - they don't have stock constraints
-            }
-
-            itemData = {
-                item_name: pkg.name,
-                base_price: parseFloat(pkg.price),
-                cost_price: totalComponentCost * requestedQty, // Dynamic COGS from components
-            };
-            break;
-
-        case 'EXTERNAL':
-            // External items (vendor services) - no stock, manual price
-            itemData = {
-                item_name: 'External Service', // Will be overwritten by request
-                base_price: 0,
-                cost_price: 0,
-            };
-            break;
-
-        default:
-            return { error: `Invalid item type: ${itemType}` };
-    }
-
-    return {
-        itemData,
-        componentsToDeduct
-    };
-};
-
-/**
- * Deduct stock and create inventory logs
- */
-const deductInventory = async (componentsToDeduct, transactionId, userId, t) => {
-    for (const component of componentsToDeduct) {
-        const product = await Product.findByPk(component.product_id, {
-            transaction: t,
-            lock: t.LOCK.UPDATE
-        });
-
-        const stockBefore = product.stock;
-        const stockAfter = stockBefore - component.qty;
-
-        // Update product stock
-        await product.update({ stock: stockAfter }, { transaction: t });
-
-        // Create inventory log
-        await InventoryLog.create({
-            product_id: component.product_id,
-            user_id: userId,
-            type: 'OUT',
-            qty: component.qty,
-            stock_before: stockBefore,
-            stock_after: stockAfter,
-            reference_type: 'TRANSACTION',
-            reference_id: `TRX-${transactionId}`,
-            notes: component.is_package_component 
-                ? `Out via Package "${component.package_name}" - Transaction #${transactionId}`
-                : `Sale - Transaction #${transactionId}`
-        }, { transaction: t });
-    }
-};
-
-/**
  * Restore stock when transaction is cancelled
  */
 const restoreInventory = async (transactionId, userId, t) => {
@@ -336,29 +159,6 @@ const restoreInventory = async (transactionId, userId, t) => {
             }, { transaction: t });
         }
     }
-};
-
-/**
- * Calculate transaction totals
- */
-const calculateTotals = (items, globalDiscount = 0) => {
-    let subtotal = 0;
-    let totalCost = 0;
-
-    for (const item of items) {
-        const itemSubtotal = (parseFloat(item.base_price) - parseFloat(item.discount_amount || 0)) * item.qty;
-        subtotal += itemSubtotal;
-        totalCost += parseFloat(item.cost_price || 0) * item.qty;
-    }
-
-    const totalAmount = subtotal - globalDiscount;
-
-    return {
-        subtotal,
-        total_amount: totalAmount,
-        total_cost: totalCost,
-        profit: totalAmount - totalCost
-    };
 };
 
 // ============================================
@@ -645,7 +445,9 @@ exports.createTransaction = async (req, res) => {
         let initialStatus = isPending ? 'PENDING' : 'UNPAID';
         let paidAmount = 0;
         if (initial_payment && initial_payment.amount > 0) {
-            paidAmount = parseFloat(initial_payment.amount);
+            // Cap recorded payment at the bill total. Cash overpayment is "change given",
+            // not revenue — storing the full tendered amount would inflate financial reports.
+            paidAmount = Math.min(parseFloat(initial_payment.amount), totalAmount);
             if (paidAmount >= totalAmount) {
                 initialStatus = 'PAID';
             } else if (paidAmount > 0) {
@@ -722,8 +524,8 @@ exports.createTransaction = async (req, res) => {
             }
         }
 
-        // Create initial payment if provided
-        if (initial_payment && initial_payment.amount > 0) {
+        // Create initial payment if provided (paidAmount is already capped at total)
+        if (paidAmount > 0) {
             await Payment.create({
                 transaction_id: transaction.id,
                 user_id: userId,
@@ -1370,6 +1172,11 @@ exports.getAllTransactions = async (req, res) => {
 
         const offset = (parseInt(page) - 1) * parseInt(limit);
 
+        // Whitelist sortable columns; an unknown sort_by would otherwise make Sequelize throw.
+        const ALLOWED_SORT = ['date', 'total_amount', 'status', 'id', 'created_at'];
+        const sortBy = ALLOWED_SORT.includes(sort_by) ? sort_by : 'date';
+        const sortOrder = String(sort_order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
         const { count, rows: transactions } = await Transaction.findAndCountAll({
             where,
             include: [
@@ -1386,7 +1193,7 @@ exports.getAllTransactions = async (req, res) => {
                 { model: Mechanic, as: 'mechanic', attributes: ['id', 'name'] },
                 { model: Payment, as: 'payments', attributes: ['id', 'amount', 'payment_method', 'date'] }
             ],
-            order: [[sort_by, sort_order.toUpperCase()]],
+            order: [[sortBy, sortOrder]],
             limit: parseInt(limit),
             offset
         });
@@ -1498,18 +1305,22 @@ exports.addPayment = async (req, res) => {
             });
         }
 
+        // Cap recorded payment at the outstanding balance. Cash overpayment is
+        // "change given", not revenue — storing the full tendered amount would inflate reports.
+        const appliedAmount = Math.min(parseFloat(amount), remaining);
+
         // Create payment
         const payment = await Payment.create({
             transaction_id: transaction.id,
             user_id: userId,
-            amount: parseFloat(amount),
+            amount: appliedAmount,
             payment_method: payment_method,
             reference_number: reference_number || null,
             date: new Date()
         }, { transaction: t });
 
         // Calculate new totals
-        const newTotalPaid = currentPaid + parseFloat(amount);
+        const newTotalPaid = currentPaid + appliedAmount;
         const newRemaining = parseFloat(transaction.total_amount) - newTotalPaid;
 
         // Determine new status
@@ -1630,6 +1441,29 @@ exports.cancelTransaction = async (req, res) => {
 
         // Restore inventory
         await restoreInventory(transaction.id, userId, t);
+
+        // Roll back the vehicle service reminder if THIS paid transaction set one.
+        // Recompute from the vehicle's latest remaining PAID transaction (reusing the
+        // same reminder logic), or clear it when no prior paid service exists.
+        if (transaction.status === 'PAID' && transaction.vehicle_id) {
+            const lastPaid = await Transaction.findOne({
+                where: {
+                    vehicle_id: transaction.vehicle_id,
+                    status: 'PAID',
+                    id: { [Op.ne]: transaction.id }
+                },
+                order: [['date', 'DESC']],
+                transaction: t
+            });
+            if (lastPaid) {
+                await calculateNextServiceReminder(transaction.vehicle_id, lastPaid.current_km, lastPaid.date, t);
+            } else {
+                await Vehicle.update(
+                    { next_service_date: null, next_service_km: null },
+                    { where: { id: transaction.vehicle_id }, transaction: t }
+                );
+            }
+        }
 
         // Update transaction status
         await transaction.update({

@@ -75,7 +75,7 @@ exports.createPayment = async (req, res) => {
 exports.getPayments = async (req, res) => {
     try {
         const payments = await Payment.findAll();
-        return res.status(200).json(payments);
+        return res.status(200).json({ success: true, data: payments });
     } catch (error) {
         return res.status(500).json({ message: 'Error fetching payments', error });
     }
@@ -88,7 +88,7 @@ exports.getPaymentById = async (req, res) => {
         if (!payment) {
             return res.status(404).json({ message: 'Payment not found' });
         }
-        return res.status(200).json(payment);
+        return res.status(200).json({ success: true, data: payment });
     } catch (error) {
         return res.status(500).json({ message: 'Error fetching payment', error });
     }
@@ -119,7 +119,7 @@ exports.updatePayment = async (req, res) => {
             await transaction.update({ status: newStatus });
         }
 
-        return res.status(200).json(payment);
+        return res.status(200).json({ success: true, data: payment });
     } catch (error) {
         return res.status(500).json({ message: 'Error updating payment', error });
     }

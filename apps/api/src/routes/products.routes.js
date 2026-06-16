@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const productsController = require('../controllers/products.controller');
 const { verifyToken, requireRole } = require('../middleware/auth.middleware');
-const { validateProduct } = require('../middleware/validation.middleware');
+const { validateProduct, handleValidationErrors } = require('../middleware/validation.middleware');
 const multer = require('multer');
 const path = require('path');
 
@@ -37,7 +37,7 @@ router.post('/:id/upload-image', verifyToken, requireRole('ADMIN'), upload.singl
 router.get('/:id', productsController.getProductById);
 
 // Protected routes (Admin only)
-router.post('/', verifyToken, requireRole('ADMIN'), upload.single('image'), validateProduct, productsController.createProduct);
+router.post('/', verifyToken, requireRole('ADMIN'), upload.single('image'), validateProduct, handleValidationErrors, productsController.createProduct);
 router.put('/:id', verifyToken, requireRole('ADMIN'), upload.single('image'), productsController.updateProduct);
 router.delete('/:id', verifyToken, requireRole('ADMIN'), productsController.deleteProduct);
 

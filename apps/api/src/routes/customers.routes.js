@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const customersController = require('../controllers/customers.controller');
 const { verifyToken } = require('../middleware/auth.middleware');
+const { validateCustomer, handleValidationErrors } = require('../middleware/validation.middleware');
 const multer = require('multer');
 const path = require('path');
 
@@ -51,7 +52,7 @@ router.get('/:id', customersController.getCustomerById);
 router.post('/:id/upload-photo', upload.single('photo'), customersController.uploadCustomerPhoto);
 
 // Create a new customer
-router.post('/', optionalUpload, customersController.createCustomer);
+router.post('/', optionalUpload, validateCustomer, handleValidationErrors, customersController.createCustomer);
 
 // Update an existing customer
 router.put('/:id', optionalUpload, customersController.updateCustomer);
