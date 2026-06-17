@@ -12,6 +12,13 @@ import {
   type TransactionStatus,
 } from '@/lib/api/transactions';
 
+/** Surface the API's descriptive message (e.g. "Insufficient stock…") instead of a generic toast. */
+function apiErrorMessage(error: unknown, fallback: string): string {
+  const msg = (error as { response?: { data?: { message?: unknown } } })
+    ?.response?.data?.message;
+  return typeof msg === 'string' && msg.length > 0 ? msg : fallback;
+}
+
 export function useTransactions(params?: {
   status?: TransactionStatus;
   search?: string;
@@ -45,7 +52,8 @@ export function useCreateTransaction() {
       qc.invalidateQueries({ queryKey: ['products'] });
       toast.success('Transaksi berhasil dibuat');
     },
-    onError: () => toast.error('Gagal membuat transaksi'),
+    onError: error =>
+      toast.error(apiErrorMessage(error, 'Gagal membuat transaksi')),
   });
 }
 
@@ -71,7 +79,8 @@ export function useAddPayment() {
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       toast.success('Pembayaran berhasil dicatat');
     },
-    onError: () => toast.error('Gagal mencatat pembayaran'),
+    onError: error =>
+      toast.error(apiErrorMessage(error, 'Gagal mencatat pembayaran')),
   });
 }
 
@@ -84,6 +93,7 @@ export function useCancelTransaction() {
       qc.invalidateQueries({ queryKey: ['products'] });
       toast.success('Transaksi dibatalkan, stok dikembalikan');
     },
-    onError: () => toast.error('Gagal membatalkan transaksi'),
+    onError: error =>
+      toast.error(apiErrorMessage(error, 'Gagal membatalkan transaksi')),
   });
 }

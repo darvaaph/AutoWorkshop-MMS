@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 import {
   Plus,
   Minus,
@@ -54,6 +55,9 @@ interface CartItem {
   item_name: string;
   base_price: number;
   qty: number;
+  // Available units for a catalog PRODUCT; undefined = unlimited (SERVICE / PACKAGE / EXTERNAL).
+  // Client-side cap only — the server remains the source of truth at checkout.
+  stock?: number;
 }
 
 const TABS: Array<{ value: ItemTab; label: string }> = [
@@ -150,6 +154,7 @@ function ItemCard({
 
 export default function PosPage() {
   const router = useRouter();
+  const orderPanelRef = useRef<HTMLDivElement>(null);
 
   // Selections
   const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
@@ -206,21 +211,36 @@ export default function PosPage() {
   );
   const discountAmt = parseFloat(discount) || 0;
   const total = Math.max(0, subtotal - discountAmt);
-  const payAmt = parseFloat(paymentAmount) || total;
+  // Empty field = "uang pas" (pay full). An explicit 0 stays 0 so a partial/unpaid
+  // bon sementara can be recorded. Negatives are clamped away.
+  const payAmt =
+    paymentAmount === '' ? total : Math.max(0, parseFloat(paymentAmount) || 0);
   const change = paymentMethod === 'CASH' ? payAmt - total : 0;
 
-  const addToCart = useCallback((item: Omit<CartItem, 'key' | 'qty'>) => {
+  function addToCart(item: Omit<CartItem, 'key' | 'qty'>) {
     const key = `${item.item_type}-${item.item_id ?? item.item_name}`;
+    const existing = cart.find(c => c.key === key);
+    if (existing && existing.stock != null && existing.qty >= existing.stock) {
+      toast.error(`Stok ${existing.item_name} tinggal ${existing.stock}`);
+      return;
+    }
     setCart(prev => {
-      const existing = prev.find(c => c.key === key);
-      if (existing) {
+      const ex = prev.find(c => c.key === key);
+      if (ex) {
         return prev.map(c => (c.key === key ? { ...c, qty: c.qty + 1 } : c));
       }
       return [...prev, { ...item, key, qty: 1 }];
     });
-  }, []);
+  }
 
   function updateQty(key: string, delta: number) {
+    if (delta > 0) {
+      const c = cart.find(x => x.key === key);
+      if (c && c.stock != null && c.qty >= c.stock) {
+        toast.error(`Stok ${c.item_name} tinggal ${c.stock}`);
+        return;
+      }
+    }
     setCart(prev =>
       prev
         .map(c => (c.key === key ? { ...c, qty: c.qty + delta } : c))
@@ -441,6 +461,7 @@ export default function PosPage() {
                             item_id: p.id,
                             item_name: p.name,
                             base_price: parseFloat(p.price_sell),
+                            stock: p.stock,
                           })
                         }
                       />
@@ -547,7 +568,10 @@ export default function PosPage() {
         </div>
 
         {/* ── Right: order panel ── */}
-        <div className="rounded-xl border bg-white lg:sticky lg:top-4 overflow-hidden">
+        <div
+          ref={orderPanelRef}
+          className="rounded-xl border bg-white lg:sticky lg:top-4 overflow-hidden scroll-mt-4"
+        >
           {/* Panel header */}
           <div className="flex items-center justify-between px-4 h-12 border-b">
             <div className="flex items-center gap-2">
@@ -733,12 +757,12 @@ export default function PosPage() {
                               ? removeFromCart(item.key)
                               : updateQty(item.key, -1)
                           }
-                          className="w-6 h-6 rounded-md border flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+                          className="w-8 h-8 rounded-md border flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
                         >
                           <Minus className="h-3 w-3" />
                         </button>
                         <span
-                          className="w-6 text-center text-[12.5px] font-[550]"
+                          className="w-8 text-center text-[12.5px] font-[550]"
                           style={{ color: 'var(--navy-900)' }}
                         >
                           {item.qty}
@@ -746,7 +770,8 @@ export default function PosPage() {
                         <button
                           type="button"
                           onClick={() => updateQty(item.key, 1)}
-                          className="w-6 h-6 rounded-md border flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+                          disabled={item.stock != null && item.qty >= item.stock}
+                          className="w-8 h-8 rounded-md border flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                         >
                           <Plus className="h-3 w-3" />
                         </button>
@@ -904,6 +929,33 @@ export default function PosPage() {
           </div>
         </div>
       </div>
+
+      {/* Mobile floating cart bar — jumps to the order panel / checkout.
+          Hidden on lg+ where the panel is already visible beside the catalog. */}
+      {cart.length > 0 && (
+        <button
+          type="button"
+          onClick={() =>
+            orderPanelRef.current?.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start',
+            })
+          }
+          className="lg:hidden fixed left-4 right-4 bottom-nav-offset z-40 flex items-center justify-between h-14 px-4 rounded-[14px] text-white shadow-xl active:scale-[0.99] transition-transform"
+          style={{ background: 'var(--navy-900)' }}
+        >
+          <span className="flex items-center gap-2 text-[13px] font-[600]">
+            <ShoppingCart className="h-4 w-4" />
+            {cart.reduce((n, c) => n + c.qty, 0)} item · Lihat Pesanan
+          </span>
+          <span
+            className="text-[14px] font-[650]"
+            style={{ fontFamily: 'ui-monospace, monospace' }}
+          >
+            {formatRupiah(total)}
+          </span>
+        </button>
+      )}
 
       {/* Vehicle picker modal */}
       <Dialog open={vehicleModalOpen} onOpenChange={setVehicleModalOpen}>

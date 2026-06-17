@@ -180,57 +180,59 @@ export function Sidebar() {
       </aside>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="flex md:hidden fixed bottom-0 left-0 right-0 border-t bg-white z-50 shadow-lg h-[68px] pb-safe">
-        {mobileNavItems.map(item => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          const isPos = item.href === '/dashboard/pos';
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 border-t bg-white z-50 shadow-lg pb-safe">
+        <div className="flex h-[68px]">
+          {mobileNavItems.map(item => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            const isPos = item.href === '/dashboard/pos';
 
-          if (isPos) {
+            if (isPos) {
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex flex-col items-center justify-center flex-1 gap-0.5"
+                >
+                  <div
+                    className="w-12 h-12 rounded-[14px] flex items-center justify-center -mt-3.5"
+                    style={{
+                      background: 'var(--orange-500)',
+                      boxShadow: '0 4px 14px rgba(240,137,58,0.4)',
+                    }}
+                  >
+                    <Icon className="h-5 w-5 text-white" />
+                  </div>
+                  <span
+                    className="text-[10px] font-[550] mt-0.5"
+                    style={{ color: 'var(--orange-600)' }}
+                  >
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            }
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex flex-col items-center justify-center flex-1 gap-0.5"
+                className={cn(
+                  'flex flex-col items-center justify-center flex-1 py-2 gap-0.5 transition-colors',
+                  active ? 'text-slate-900' : 'text-slate-400'
+                )}
               >
-                <div
-                  className="w-12 h-12 rounded-[14px] flex items-center justify-center -mt-3.5"
-                  style={{
-                    background: 'var(--orange-500)',
-                    boxShadow: '0 4px 14px rgba(240,137,58,0.4)',
-                  }}
-                >
-                  <Icon className="h-5 w-5 text-white" />
-                </div>
-                <span
-                  className="text-[10px] font-[550] mt-0.5"
-                  style={{ color: 'var(--orange-600)' }}
-                >
+                <Icon
+                  className="h-5 w-5"
+                  style={active ? { color: 'var(--orange-500)' } : undefined}
+                />
+                <span className="text-[10px] font-[550] leading-none truncate max-w-[60px] text-center">
                   {item.label}
                 </span>
               </Link>
             );
-          }
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex flex-col items-center justify-center flex-1 py-2 gap-0.5 transition-colors',
-                active ? 'text-slate-900' : 'text-slate-400'
-              )}
-            >
-              <Icon
-                className="h-5 w-5"
-                style={active ? { color: 'var(--orange-500)' } : undefined}
-              />
-              <span className="text-[10px] font-[550] leading-none truncate max-w-[60px] text-center">
-                {item.label}
-              </span>
-            </Link>
-          );
-        })}
+          })}
+        </div>
       </nav>
     </>
   );

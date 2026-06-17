@@ -14,6 +14,23 @@ export function formatRupiah(value: number | string): string {
   }).format(num);
 }
 
+/**
+ * Short currency for tight spaces (e.g. 2-up stat cards on mobile):
+ * 1.250.000 -> "Rp1,3 jt", 450.000 -> "Rp450 rb", 2.1e9 -> "Rp2,1 M".
+ */
+export function formatRupiahCompact(value: number | string): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (!isFinite(num)) return 'Rp0';
+  const abs = Math.abs(num);
+  if (abs >= 1_000_000_000)
+    return `Rp${(num / 1_000_000_000).toLocaleString('id-ID', { maximumFractionDigits: 1 })} M`;
+  if (abs >= 1_000_000)
+    return `Rp${(num / 1_000_000).toLocaleString('id-ID', { maximumFractionDigits: 1 })} jt`;
+  if (abs >= 1_000)
+    return `Rp${(num / 1_000).toLocaleString('id-ID', { maximumFractionDigits: 0 })} rb`;
+  return `Rp${num.toLocaleString('id-ID')}`;
+}
+
 export function formatDate(date: string | null | undefined): string {
   if (!date) return '-';
   const d = new Date(date);

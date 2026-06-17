@@ -22,8 +22,14 @@ export async function getVehiclesApi(search?: string): Promise<Vehicle[]> {
   return res.data.data;
 }
 
-export async function getDueServiceVehiclesApi(): Promise<Vehicle[]> {
-  const res = await apiClient.get<{ data: Vehicle[] }>('/vehicles/due-service');
+export interface DueServiceVehicle extends Vehicle {
+  days_until_due: number;
+  status: 'OVERDUE' | 'DUE_TODAY' | 'UPCOMING';
+  is_contacted: boolean;
+}
+
+export async function getDueServiceVehiclesApi(): Promise<DueServiceVehicle[]> {
+  const res = await apiClient.get<{ data: DueServiceVehicle[] }>('/vehicles/due-service');
   return res.data.data;
 }
 

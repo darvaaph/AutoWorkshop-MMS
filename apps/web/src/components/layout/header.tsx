@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { LogOut, Bell, Search } from 'lucide-react';
+import { LogOut, Search } from 'lucide-react';
+import { NotificationBell } from '@/components/layout/notification-bell';
 import { toast } from 'sonner';
 
 import { useAuthStore } from '@/store/auth.store';
@@ -56,10 +57,7 @@ export function Header() {
       <div className="flex-1 md:flex-none" />
 
       <div className="flex items-center gap-2">
-        {/* Notification bell */}
-        <button className="relative w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
-          <Bell className="h-4 w-4" />
-        </button>
+        <NotificationBell />
 
         {/* User avatar / dropdown */}
         <DropdownMenu>

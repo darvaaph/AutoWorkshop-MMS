@@ -87,3 +87,22 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  /* iOS home-indicator safe area for the fixed bottom nav. Requires
+     viewportFit: 'cover' in the root viewport config to resolve non-zero. */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Floating bar offset: clears the mobile bottom-nav (68px) + safe area.
+     On md+ there is no bottom-nav, so it sits near the bottom edge instead. */
+  .bottom-nav-offset {
+    bottom: calc(68px + env(safe-area-inset-bottom) + 0.5rem);
+  }
+  @media (min-width: 768px) {
+    .bottom-nav-offset {
+      bottom: 1rem;
+    }
+  }
+}

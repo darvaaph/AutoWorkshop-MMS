@@ -31,7 +31,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatRupiah, formatDate, toWaPhone } from '@/lib/format';
+import {
+  formatRupiah,
+  formatRupiahCompact,
+  formatDate,
+  toWaPhone,
+} from '@/lib/format';
 import { useAuthStore } from '@/store/auth.store';
 import { cn } from '@/lib/utils';
 import {
@@ -64,7 +69,7 @@ function SparkBar({ data = [40, 65, 50, 80, 60, 95, 75], color = '#1b2d5e' }) {
 /* ── Stat card ── */
 interface StatCardProps {
   label: string;
-  value: string | number;
+  value: ReactNode;
   delta?: string;
   deltaUp?: boolean;
   spark?: number[];
@@ -248,7 +253,20 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         <StatCard
           label="Penjualan Hari Ini"
-          value={isLoading ? '—' : formatRupiah(stats?.today.sales ?? 0)}
+          value={
+            isLoading ? (
+              '—'
+            ) : (
+              <>
+                <span className="sm:hidden">
+                  {formatRupiahCompact(stats?.today.sales ?? 0)}
+                </span>
+                <span className="hidden sm:inline">
+                  {formatRupiah(stats?.today.sales ?? 0)}
+                </span>
+              </>
+            )
+          }
           icon={<DollarSign className="h-3.5 w-3.5" />}
           iconBg="#f0fdf4"
           iconColor="#15803d"
@@ -264,7 +282,20 @@ export default function DashboardPage() {
         />
         <StatCard
           label="Penjualan Bulan Ini"
-          value={isLoading ? '—' : formatRupiah(stats?.month.sales ?? 0)}
+          value={
+            isLoading ? (
+              '—'
+            ) : (
+              <>
+                <span className="sm:hidden">
+                  {formatRupiahCompact(stats?.month.sales ?? 0)}
+                </span>
+                <span className="hidden sm:inline">
+                  {formatRupiah(stats?.month.sales ?? 0)}
+                </span>
+              </>
+            )
+          }
           icon={<TrendingUp className="h-3.5 w-3.5" />}
           loading={isLoading}
         />
