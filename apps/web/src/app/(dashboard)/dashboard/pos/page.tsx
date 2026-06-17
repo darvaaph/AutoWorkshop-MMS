@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Plus,
@@ -155,6 +155,8 @@ function ItemCard({
 export default function PosPage() {
   const router = useRouter();
   const orderPanelRef = useRef<HTMLDivElement>(null);
+  const submitRef = useRef<HTMLButtonElement>(null);
+  const [checkoutVisible, setCheckoutVisible] = useState(false);
 
   // Selections
   const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
@@ -216,6 +218,21 @@ export default function PosPage() {
   const payAmt =
     paymentAmount === '' ? total : Math.max(0, parseFloat(paymentAmount) || 0);
   const change = paymentMethod === 'CASH' ? payAmt - total : 0;
+
+  // Hide the floating cart bar once the real "Proses Transaksi" button is on
+  // screen, so the shortcut bar never covers the actual checkout button.
+  // rootMargin shrinks the bottom of the viewport by ~the bar's footprint so it
+  // disappears just before it would overlap.
+  useEffect(() => {
+    const el = submitRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => setCheckoutVisible(entry.isIntersecting),
+      { rootMargin: '0px 0px -160px 0px' }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [successTrxId]);
 
   function addToCart(item: Omit<CartItem, 'key' | 'qty'>) {
     const key = `${item.item_type}-${item.item_id ?? item.item_name}`;
@@ -912,6 +929,7 @@ export default function PosPage() {
 
             {/* Submit */}
             <Button
+              ref={submitRef}
               className="w-full h-12 text-[14px] font-[600] text-white"
               style={{ background: 'var(--navy-900)' }}
               disabled={cart.length === 0 || createTrx.isPending}
@@ -931,8 +949,9 @@ export default function PosPage() {
       </div>
 
       {/* Mobile floating cart bar — jumps to the order panel / checkout.
-          Hidden on lg+ where the panel is already visible beside the catalog. */}
-      {cart.length > 0 && (
+          Hidden on lg+ where the panel is already visible beside the catalog,
+          and once the real checkout button is on screen (no overlap). */}
+      {cart.length > 0 && !checkoutVisible && (
         <button
           type="button"
           onClick={() =>

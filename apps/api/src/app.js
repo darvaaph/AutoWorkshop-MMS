@@ -9,7 +9,9 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-app.use(morgan('dev')); // HTTP request logger
+if (process.env.NODE_ENV !== 'test') {
+    app.use(morgan('dev')); // HTTP request logger (silent during tests)
+}
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -63,6 +65,10 @@ const startServer = async () => {
     }
 };
 
-startServer();
+// Don't bind a port (or hard-exit on DB failure) when imported by the test runner;
+// supertest drives the exported `app` directly.
+if (process.env.NODE_ENV !== 'test') {
+    startServer();
+}
 
 module.exports = app;

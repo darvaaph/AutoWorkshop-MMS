@@ -8,6 +8,7 @@ import { toWaPhone } from '@/lib/format';
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
@@ -91,8 +92,11 @@ export function NotificationBell() {
 
       {/* Notification sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-          <SheetHeader>
+        <SheetContent
+          side="bottom"
+          className="rounded-t-2xl p-0 max-h-[85dvh] overflow-y-auto pb-safe"
+        >
+          <SheetHeader className="px-5 pt-5 pb-3 border-b text-left">
             <SheetTitle className="flex items-center gap-2">
               Pengingat Servis
               {!isLoading && badgeCount > 0 && (
@@ -104,9 +108,12 @@ export function NotificationBell() {
                 </span>
               )}
             </SheetTitle>
+            <SheetDescription className="sr-only">
+              Daftar kendaraan yang perlu dihubungi untuk servis
+            </SheetDescription>
           </SheetHeader>
 
-          <div className="mt-4">
+          <div className="p-4">
             {isLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map(i => (

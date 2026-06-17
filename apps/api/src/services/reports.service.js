@@ -8,6 +8,7 @@ const Expense = require('../models/expense.model');
 const Product = require('../models/product.model');
 const Vehicle = require('../models/vehicle.model');
 const Customer = require('../models/customer.model');
+const Mechanic = require('../models/mechanic.model');
 
 // Transactions counted as finalized sales/revenue across all reports & dashboard.
 // Excludes PENDING (bon sementara / rawat inap — not a sale until closed) and CANCELLED.
@@ -252,6 +253,163 @@ class ReportsService {
                 total_amount: t.total_amount,
                 paid: (t.payments || []).reduce((s, p) => s + parseFloat(p.amount), 0)
             }))
+        };
+    }
+
+    /**
+     * Generate operational report — mechanic performance & vehicle/customer frequency.
+     * Aggregates finalized sales (SALE_STATUSES) within the date range.
+     */
+    async generateOperationalReport(options = {}) {
+        const { dateFrom, dateTo } = options;
+
+        const whereClause = { status: { [Op.in]: SALE_STATUSES } };
+        if (dateFrom && dateTo) {
+            whereClause.date = { [Op.between]: [new Date(dateFrom), new Date(dateTo + 'T23:59:59')] };
+        } else if (dateFrom) {
+            whereClause.date = { [Op.gte]: new Date(dateFrom) };
+        } else if (dateTo) {
+            whereClause.date = { [Op.lte]: new Date(dateTo + 'T23:59:59') };
+        }
+
+        const transactions = await Transaction.findAll({
+            where: whereClause,
+            order: [['date', 'DESC']],
+            include: [
+                // paranoid:false so soft-deleted mechanics/vehicles/customers still resolve
+                // their name in historical analytics (they did real work in this period).
+                { model: Mechanic, as: 'mechanic', attributes: ['id', 'name'], paranoid: false },
+                {
+                    model: Vehicle,
+                    as: 'vehicle',
+                    attributes: ['id', 'license_plate', 'brand', 'model'],
+                    paranoid: false,
+                    include: [{ model: Customer, as: 'customer', attributes: ['id', 'name'], paranoid: false }]
+                },
+                { model: TransactionItem, as: 'items' }
+            ]
+        });
+
+        const totalRevenue = transactions.reduce((s, t) => s + parseFloat(t.total_amount || 0), 0);
+        const activeMechanics = new Set();
+        const servedVehicles = new Set();
+
+        const mechanicMap = {};   // key: mechanic_id ?? 'none'
+        const vehicleMap = {};    // key: vehicle_id
+        const customerMap = {};   // key: customer_id
+
+        transactions.forEach(t => {
+            const amount = parseFloat(t.total_amount || 0);
+            const dateStr = t.date instanceof Date
+                ? t.date.toISOString()
+                : String(t.date);
+
+            // Use the resolved association (not the raw FK) so a single "Tanpa Montir"
+            // bucket collects both null FKs and any orphaned/unresolvable mechanic_id.
+            const mech = t.mechanic;
+            if (mech) activeMechanics.add(mech.id);
+            if (t.vehicle_id != null) servedVehicles.add(t.vehicle_id);
+
+            // ── Mechanic performance ──
+            const mKey = mech ? mech.id : 'none';
+            if (!mechanicMap[mKey]) {
+                mechanicMap[mKey] = {
+                    id: mech ? mech.id : null,
+                    name: mech ? mech.name : 'Tanpa Montir',
+                    transactions: 0,
+                    _vehicles: new Set(),
+                    service_revenue: 0,
+                    total_revenue: 0
+                };
+            }
+            const m = mechanicMap[mKey];
+            m.transactions++;
+            if (t.vehicle_id != null) m._vehicles.add(t.vehicle_id);
+            m.total_revenue += amount;
+            (t.items || []).forEach(item => {
+                if (item.item_type === 'SERVICE') {
+                    m.service_revenue += parseFloat(item.sell_price) * item.qty;
+                }
+            });
+
+            // ── Vehicle frequency (skip walk-in / no vehicle) ──
+            if (t.vehicle_id != null) {
+                if (!vehicleMap[t.vehicle_id]) {
+                    vehicleMap[t.vehicle_id] = {
+                        id: t.vehicle_id,
+                        license_plate: t.vehicle?.license_plate ?? '—',
+                        brand: t.vehicle?.brand ?? '',
+                        model: t.vehicle?.model ?? '',
+                        customer_name: t.vehicle?.customer?.name ?? null,
+                        visits: 0,
+                        total_spend: 0,
+                        last_visit: dateStr
+                    };
+                }
+                const v = vehicleMap[t.vehicle_id];
+                v.visits++;
+                v.total_spend += amount;
+                if (dateStr > v.last_visit) v.last_visit = dateStr;
+            }
+
+            // ── Customer frequency (derived from vehicle.customer) ──
+            const customer = t.vehicle?.customer;
+            if (customer?.id != null) {
+                if (!customerMap[customer.id]) {
+                    customerMap[customer.id] = {
+                        id: customer.id,
+                        name: customer.name,
+                        visits: 0,
+                        _vehicles: new Set(),
+                        total_spend: 0
+                    };
+                }
+                const c = customerMap[customer.id];
+                c.visits++;
+                if (t.vehicle_id != null) c._vehicles.add(t.vehicle_id);
+                c.total_spend += amount;
+            }
+        });
+
+        const mechanics = Object.values(mechanicMap)
+            .map(m => ({
+                id: m.id,
+                name: m.name,
+                transactions: m.transactions,
+                vehicles: m._vehicles.size,
+                service_revenue: m.service_revenue,
+                total_revenue: m.total_revenue,
+                avg_per_transaction: m.transactions > 0 ? m.total_revenue / m.transactions : 0
+            }))
+            .sort((a, b) => b.transactions - a.transactions);
+
+        const top_vehicles = Object.values(vehicleMap)
+            .sort((a, b) => b.visits - a.visits || b.total_spend - a.total_spend)
+            .slice(0, 10);
+
+        const top_customers = Object.values(customerMap)
+            .map(c => ({
+                id: c.id,
+                name: c.name,
+                visits: c.visits,
+                vehicles: c._vehicles.size,
+                total_spend: c.total_spend
+            }))
+            .sort((a, b) => b.total_spend - a.total_spend || b.visits - a.visits)
+            .slice(0, 10);
+
+        return {
+            period: { from: dateFrom || 'all', to: dateTo || 'all' },
+            summary: {
+                total_visits: transactions.length,
+                active_mechanics: activeMechanics.size,
+                vehicles_served: servedVehicles.size,
+                total_revenue: totalRevenue,
+                avg_value_per_visit: transactions.length > 0 ? totalRevenue / transactions.length : 0
+            },
+            mechanics,
+            top_vehicles,
+            top_customers
         };
     }
 }

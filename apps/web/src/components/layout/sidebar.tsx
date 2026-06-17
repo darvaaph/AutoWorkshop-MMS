@@ -1,11 +1,19 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LogOut, Wrench } from 'lucide-react';
+import { LogOut, Menu, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { useAuthStore } from '@/store/auth.store';
 import { logoutApi } from '@/lib/api/auth';
 import { getNavItemsForRole, mobileNavItems } from './nav-items';
@@ -54,6 +62,9 @@ export function Sidebar() {
   };
 
   const initials = user?.full_name ? getInitials(user.full_name) : 'U';
+  const [moreOpen, setMoreOpen] = useState(false);
+  // "Lainnya" tab is active whenever the current route isn't one of the primary tabs.
+  const moreActive = !mobileNavItems.some(item => isActive(item.href));
 
   return (
     <>
@@ -232,8 +243,97 @@ export function Sidebar() {
               </Link>
             );
           })}
+
+          {/* Lainnya — opens the full menu sheet */}
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            className={cn(
+              'flex flex-col items-center justify-center flex-1 py-2 gap-0.5 transition-colors',
+              moreActive ? 'text-slate-900' : 'text-slate-400'
+            )}
+          >
+            <Menu
+              className="h-5 w-5"
+              style={moreActive ? { color: 'var(--orange-500)' } : undefined}
+            />
+            <span className="text-[10px] font-[550] leading-none">Lainnya</span>
+          </button>
         </div>
       </nav>
+
+      {/* Full-menu sheet (mobile only) */}
+      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+        <SheetContent
+          side="bottom"
+          className="rounded-t-2xl p-0 max-h-[80dvh] overflow-y-auto pb-safe"
+        >
+          <SheetHeader className="px-5 pt-5 pb-3 border-b text-left">
+            <SheetTitle
+              className="text-[16px]"
+              style={{ color: 'var(--navy-900)' }}
+            >
+              Menu
+            </SheetTitle>
+            <SheetDescription className="sr-only">
+              Navigasi seluruh halaman
+            </SheetDescription>
+          </SheetHeader>
+          <div className="p-4 space-y-4">
+            {Object.entries(sections).map(([section, items]) => (
+              <div key={section}>
+                <p className="px-1 pb-2 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-slate-400">
+                  {section}
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {items.map(item => {
+                    const Icon = item.icon;
+                    const active = isActive(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMoreOpen(false)}
+                        className={cn(
+                          'flex flex-col items-center gap-1.5 rounded-xl border p-3 text-center transition-colors',
+                          active
+                            ? 'border-transparent'
+                            : 'border-slate-100 hover:bg-slate-50'
+                        )}
+                        style={
+                          active ? { background: 'var(--navy-50)' } : undefined
+                        }
+                      >
+                        <Icon
+                          className="h-5 w-5"
+                          style={{ color: active ? 'var(--navy-800)' : '#64748b' }}
+                        />
+                        <span
+                          className="text-[11px] font-[550] leading-tight"
+                          style={{
+                            color: active ? 'var(--navy-900)' : '#475569',
+                          }}
+                        >
+                          {item.label}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex items-center justify-center gap-2 w-full h-11 rounded-xl border border-red-100 text-red-600 text-[13px] font-[550] hover:bg-red-50 transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+              Keluar
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

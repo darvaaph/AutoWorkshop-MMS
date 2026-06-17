@@ -44,3 +44,14 @@ exports.getSalesReport = async (req, res) => {
         res.status(500).json({ success: false, message: 'Error generating sales report', error: error.message });
     }
 };
+
+// Get operational report (mechanic performance & vehicle/customer frequency)
+exports.getOperationalReport = async (req, res) => {
+    try {
+        const { date_from, date_to } = req.query;
+        const report = await reportsService.generateOperationalReport({ dateFrom: date_from, dateTo: date_to });
+        res.status(200).json({ success: true, data: report });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error generating operational report', error: error.message });
+    }
+};

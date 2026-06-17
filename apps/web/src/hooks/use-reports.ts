@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   getFinancialReportApi,
   getInventoryReportApi,
+  getOperationalReportApi,
   getSalesReportApi,
 } from '@/lib/api/reports';
 
@@ -29,5 +30,13 @@ export function useInventoryReport() {
   return useQuery({
     queryKey: ['reports', 'inventory'],
     queryFn: getInventoryReportApi,
+  });
+}
+
+export function useOperationalReport(params: { date_from: string; date_to: string }) {
+  return useQuery({
+    queryKey: ['reports', 'operational', params],
+    queryFn: () => getOperationalReportApi(params),
+    enabled: !!params.date_from && !!params.date_to,
   });
 }

@@ -214,6 +214,8 @@ export default function ExpensesPage() {
 
       {/* Table */}
       <div className="rounded-xl border bg-white overflow-hidden">
+        <div className="overflow-x-auto">
+        <div className="min-w-[600px]">
         <div
           className="grid text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em] px-4 py-2.5 border-b"
           style={{
@@ -313,6 +315,8 @@ export default function ExpensesPage() {
             })}
           </div>
         )}
+        </div>
+        </div>
       </div>
 
       {/* Add/Edit dialog */}

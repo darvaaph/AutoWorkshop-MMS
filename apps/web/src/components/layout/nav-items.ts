@@ -137,12 +137,12 @@ export const navItems: NavItem[] = [
   },
 ];
 
+// Primary tabs for the mobile bottom nav (4 + a "Lainnya" sheet for everything else).
 export const mobileNavItems: NavItem[] = navItems.filter(item =>
   [
     '/dashboard',
-    '/dashboard/customers',
-    '/dashboard/vehicles',
     '/dashboard/pos',
+    '/dashboard/vehicles',
     '/dashboard/transactions',
   ].includes(item.href)
 );

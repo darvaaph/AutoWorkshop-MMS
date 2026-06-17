@@ -41,6 +41,7 @@ type ProductForm = z.infer<typeof productSchema>;
 export default function ProductsPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
+  const [stockStatus, setStockStatus] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Product | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
@@ -57,6 +58,15 @@ export default function ProductsPage() {
 
   const products = data?.products ?? [];
   const categories = data?.categories ?? [];
+
+  // Client-side stock-status filter (server already handles search + category).
+  const visibleProducts = products.filter(p => {
+    if (stockStatus === 'out') return p.stock === 0;
+    if (stockStatus === 'low')
+      return p.stock > 0 && p.stock <= p.min_stock_alert;
+    if (stockStatus === 'normal') return p.stock > p.min_stock_alert;
+    return true;
+  });
 
   const {
     register,
@@ -175,11 +185,15 @@ export default function ProductsPage() {
               ))}
             </select>
           )}
-          <select className="h-[38px] flex-1 sm:flex-none border border-input rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-ring">
-            <option>Semua Status</option>
-            <option>Stok Normal</option>
-            <option>Stok Menipis</option>
-            <option>Habis</option>
+          <select
+            value={stockStatus}
+            onChange={e => setStockStatus(e.target.value)}
+            className="h-[38px] flex-1 sm:flex-none border border-input rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="">Semua Status</option>
+            <option value="normal">Stok Normal</option>
+            <option value="low">Stok Menipis</option>
+            <option value="out">Habis</option>
           </select>
         </div>
       </div>
@@ -211,18 +225,18 @@ export default function ProductsPage() {
               </div>
             ))}
           </div>
-        ) : products.length === 0 ? (
+        ) : visibleProducts.length === 0 ? (
           <div className="py-16 text-center">
             <Package className="h-10 w-10 mx-auto mb-3 text-slate-300" />
             <p className="text-sm text-slate-400">
-              {search || category
+              {search || category || stockStatus
                 ? 'Tidak ada hasil untuk filter ini.'
                 : 'Belum ada produk.'}
             </p>
           </div>
         ) : (
           <div className="divide-y">
-            {products.map(p => {
+            {visibleProducts.map(p => {
               const low = p.stock <= p.min_stock_alert;
               const out = p.stock === 0;
               return (
@@ -365,18 +379,18 @@ export default function ProductsPage() {
               <Skeleton key={i} className="h-[76px] w-full rounded-xl" />
             ))}
           </div>
-        ) : products.length === 0 ? (
+        ) : visibleProducts.length === 0 ? (
           <div className="rounded-xl border bg-white py-16 text-center">
             <Package className="h-10 w-10 mx-auto mb-3 text-slate-300" />
             <p className="text-sm text-slate-400">
-              {search || category
+              {search || category || stockStatus
                 ? 'Tidak ada hasil untuk filter ini.'
                 : 'Belum ada produk.'}
             </p>
           </div>
         ) : (
           <div className="space-y-2.5">
-            {products.map(p => {
+            {visibleProducts.map(p => {
               const low = p.stock <= p.min_stock_alert;
               const out = p.stock === 0;
               return (

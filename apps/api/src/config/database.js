@@ -1,8 +1,13 @@
 require('dotenv').config();
 const { Sequelize } = require('sequelize');
 
+// Use a dedicated database when running tests so dev/prod data is never touched.
+// Jest sets NODE_ENV=test automatically; the test DB is `<DB_NAME>_test`.
+const isTest = process.env.NODE_ENV === 'test';
+const databaseName = isTest ? `${process.env.DB_NAME}_test` : process.env.DB_NAME;
+
 const sequelize = new Sequelize(
-    process.env.DB_NAME,
+    databaseName,
     process.env.DB_USER,
     process.env.DB_PASS,
     {
@@ -26,7 +31,7 @@ const sequelize = new Sequelize(
 const connectToDatabase = async () => {
     try {
         await sequelize.authenticate();
-        console.log(`✅ Database Connected to MariaDB [${process.env.DB_NAME}]`);
+        console.log(`✅ Database Connected to MariaDB [${databaseName}]`);
     } catch (error) {
         console.error('❌ Unable to connect to the database:', error.message);
         process.exit(1);

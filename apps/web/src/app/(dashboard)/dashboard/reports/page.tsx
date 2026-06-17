@@ -1,13 +1,13 @@
 'use client';
 
 import { type ReactNode, useState } from 'react';
-import { BarChart3, TrendingUp, DollarSign, Package, AlertTriangle, Wrench } from 'lucide-react';
+import { BarChart3, TrendingUp, DollarSign, Package, AlertTriangle, Wrench, UserCog, Car, Users } from 'lucide-react';
 
-import { useFinancialReport, useSalesReport, useInventoryReport } from '@/hooks/use-reports';
+import { useFinancialReport, useSalesReport, useInventoryReport, useOperationalReport } from '@/hooks/use-reports';
 import { formatRupiah } from '@/lib/format';
 import { Skeleton } from '@/components/ui/skeleton';
 
-type Tab = 'financial' | 'sales' | 'inventory';
+type Tab = 'financial' | 'sales' | 'inventory' | 'operational';
 
 function todayISO() {
   return new Date().toISOString().split('T')[0];
@@ -209,11 +209,13 @@ export default function ReportsPage() {
   const { data: financial, isLoading: finLoading } = useFinancialReport({ date_from: dateFrom, date_to: dateTo });
   const { data: sales, isLoading: salesLoading } = useSalesReport({ date_from: dateFrom, date_to: dateTo });
   const { data: inventory, isLoading: invLoading } = useInventoryReport();
+  const { data: operational, isLoading: opLoading } = useOperationalReport({ date_from: dateFrom, date_to: dateTo });
 
   const TABS: Array<{ key: Tab; label: string }> = [
     { key: 'financial', label: 'Keuangan' },
     { key: 'sales', label: 'Penjualan' },
     { key: 'inventory', label: 'Inventori' },
+    { key: 'operational', label: 'Operasional' },
   ];
 
   return (
@@ -229,13 +231,14 @@ export default function ReportsPage() {
       </div>
 
       {/* Tabs */}
+      <div className="-mx-4 px-4 overflow-x-auto md:mx-0 md:px-0">
       <div className="flex gap-1 p-1 bg-slate-100 rounded-[12px] w-fit">
         {TABS.map(t => (
           <button
             key={t.key}
             type="button"
             onClick={() => setActiveTab(t.key)}
-            className="px-5 h-9 rounded-[10px] text-[13px] font-[550] transition-all"
+            className="px-5 h-9 rounded-[10px] text-[13px] font-[550] transition-all flex-shrink-0 whitespace-nowrap"
             style={
               activeTab === t.key
                 ? { background: '#fff', color: 'var(--navy-900)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }
@@ -245,6 +248,7 @@ export default function ReportsPage() {
             {t.label}
           </button>
         ))}
+      </div>
       </div>
 
       {/* Date range (financial + sales) */}
@@ -347,6 +351,8 @@ export default function ReportsPage() {
           {/* Transaction list */}
           {!finLoading && financial && (financial.transactions?.length ?? 0) > 0 && (
             <div className="rounded-xl border bg-white overflow-hidden">
+              <div className="overflow-x-auto">
+              <div className="min-w-[480px]">
               <div
                 className="grid text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em] px-4 py-2.5 border-b"
                 style={{ gridTemplateColumns: '100px 1fr 130px 90px', background: '#fafafa' }}
@@ -381,6 +387,8 @@ export default function ReportsPage() {
                     <div className="text-center text-[11px] text-slate-500">{t.status}</div>
                   </div>
                 ))}
+              </div>
+              </div>
               </div>
             </div>
           )}
@@ -510,6 +518,8 @@ export default function ReportsPage() {
               >
                 Per Kategori
               </div>
+              <div className="overflow-x-auto">
+              <div className="min-w-[360px]">
               <div
                 className="grid text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em] px-4 py-2 border-b"
                 style={{ gridTemplateColumns: '1fr 80px 130px', background: '#fafafa' }}
@@ -538,6 +548,8 @@ export default function ReportsPage() {
                   </div>
                 ))}
               </div>
+              </div>
+              </div>
             </div>
           )}
 
@@ -551,6 +563,8 @@ export default function ReportsPage() {
                 <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
                 <span className="text-red-500 uppercase tracking-[0.04em]">Produk Stok Menipis</span>
               </div>
+              <div className="overflow-x-auto">
+              <div className="min-w-[560px]">
               <div
                 className="grid text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em] px-4 py-2 border-b"
                 style={{ gridTemplateColumns: '90px 1fr 100px 100px 110px', background: '#fafafa' }}
@@ -591,8 +605,267 @@ export default function ReportsPage() {
                   </div>
                 ))}
               </div>
+              </div>
+              </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Operational tab ── */}
+      {activeTab === 'operational' && (
+        <div className="space-y-4">
+          {/* Summary row */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Total Kunjungan', value: String(operational?.summary?.total_visits ?? 0), mono: false },
+              { label: 'Montir Aktif', value: String(operational?.summary?.active_mechanics ?? 0), mono: false },
+              { label: 'Kendaraan Dilayani', value: String(operational?.summary?.vehicles_served ?? 0), mono: false },
+              {
+                label: 'Rata-rata / Kunjungan',
+                value: formatRupiah(String(Math.round(operational?.summary?.avg_value_per_visit ?? 0))),
+                mono: true,
+              },
+            ].map(item => (
+              <div key={item.label} className="rounded-xl border bg-white p-3.5">
+                <p className="text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em] mb-2">
+                  {item.label}
+                </p>
+                {opLoading ? (
+                  <Skeleton className="h-6 w-20 rounded" />
+                ) : (
+                  <p
+                    className="text-[17px] font-[650] tracking-[-0.02em] leading-none"
+                    style={{
+                      fontFamily: item.mono ? 'ui-monospace, monospace' : undefined,
+                      color: 'var(--navy-900)',
+                    }}
+                  >
+                    {item.value}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Mechanic performance */}
+          <div className="rounded-xl border bg-white overflow-hidden">
+            <div className="px-4 py-2.5 border-b flex items-center gap-2" style={{ background: '#fafafa' }}>
+              <div
+                className="w-5 h-5 rounded-[6px] flex items-center justify-center"
+                style={{ background: 'var(--navy-50)', color: 'var(--navy-800)' }}
+              >
+                <UserCog className="h-3 w-3" />
+              </div>
+              <span className="text-[11.5px] font-[550] text-slate-500 uppercase tracking-[0.04em]">
+                Performa Montir
+              </span>
+            </div>
+            <div
+              className="grid text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em] px-4 py-2 border-b"
+              style={{ gridTemplateColumns: '1fr 70px 80px 120px', background: '#fafafa' }}
+            >
+              <div>Montir</div>
+              <div className="text-center">Transaksi</div>
+              <div className="text-center">Kendaraan</div>
+              <div className="text-right">Nilai Jasa</div>
+            </div>
+            {opLoading ? (
+              <div className="divide-y">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center justify-between px-4 py-2.5">
+                    <Skeleton className="h-3.5 w-28 rounded" />
+                    <Skeleton className="h-3.5 w-16 rounded" />
+                  </div>
+                ))}
+              </div>
+            ) : (operational?.mechanics?.length ?? 0) === 0 ? (
+              <p className="px-4 py-8 text-[13px] text-slate-400 text-center">
+                Belum ada transaksi pada periode ini
+              </p>
+            ) : (
+              <div className="divide-y">
+                {(operational?.mechanics ?? []).map((m, i) => (
+                  <div
+                    key={m.id ?? `none-${i}`}
+                    className="grid items-center px-4 py-2.5"
+                    style={{ gridTemplateColumns: '1fr 70px 80px 120px' }}
+                  >
+                    <span
+                      className={`text-[13px] truncate ${m.id == null ? 'italic text-slate-400' : 'font-[550]'}`}
+                      style={m.id != null ? { color: 'var(--navy-900)' } : undefined}
+                    >
+                      {m.name}
+                    </span>
+                    <span
+                      className="text-center text-[13px] font-[600]"
+                      style={{ fontFamily: 'ui-monospace, monospace', color: 'var(--navy-900)' }}
+                    >
+                      {m.transactions}
+                    </span>
+                    <span
+                      className="text-center text-[12.5px] text-slate-500"
+                      style={{ fontFamily: 'ui-monospace, monospace' }}
+                    >
+                      {m.vehicles}
+                    </span>
+                    <span
+                      className="text-right text-[12.5px] font-[600]"
+                      style={{ fontFamily: 'ui-monospace, monospace', color: 'var(--navy-900)' }}
+                    >
+                      {formatRupiah(String(Math.round(m.service_revenue)))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Top vehicles */}
+          <div className="rounded-xl border bg-white overflow-hidden">
+            <div className="px-4 py-2.5 border-b flex items-center gap-2" style={{ background: '#fafafa' }}>
+              <div
+                className="w-5 h-5 rounded-[6px] flex items-center justify-center"
+                style={{ background: '#fff7ed', color: '#c2410c' }}
+              >
+                <Car className="h-3 w-3" />
+              </div>
+              <span className="text-[11.5px] font-[550] text-slate-500 uppercase tracking-[0.04em]">
+                Kendaraan Paling Sering Masuk
+              </span>
+            </div>
+            {opLoading ? (
+              <div className="divide-y">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center justify-between px-4 py-2.5">
+                    <Skeleton className="h-3.5 w-36 rounded" />
+                    <Skeleton className="h-3.5 w-20 rounded" />
+                  </div>
+                ))}
+              </div>
+            ) : (operational?.top_vehicles?.length ?? 0) === 0 ? (
+              <p className="px-4 py-8 text-[13px] text-slate-400 text-center">
+                Belum ada kunjungan kendaraan
+              </p>
+            ) : (
+              <div className="divide-y">
+                {(operational?.top_vehicles ?? []).map(v => (
+                  <div
+                    key={v.id}
+                    className="grid items-center px-4 py-2.5"
+                    style={{ gridTemplateColumns: '1fr 64px 130px' }}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="text-[10.5px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                          style={{
+                            background: '#1a1a1a',
+                            color: '#e8d84a',
+                            fontFamily: 'ui-monospace, monospace',
+                            letterSpacing: '0.04em',
+                          }}
+                        >
+                          {v.license_plate}
+                        </span>
+                        <span className="text-[12.5px] text-slate-600 truncate">
+                          {v.brand} {v.model}
+                        </span>
+                      </div>
+                      {v.customer_name && (
+                        <p className="text-[11px] text-slate-400 mt-0.5 truncate">{v.customer_name}</p>
+                      )}
+                    </div>
+                    <div className="text-center">
+                      <span
+                        className="text-[13px] font-[650]"
+                        style={{ fontFamily: 'ui-monospace, monospace', color: 'var(--navy-900)' }}
+                      >
+                        {v.visits}×
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <p
+                        className="text-[12.5px] font-[600]"
+                        style={{ fontFamily: 'ui-monospace, monospace', color: 'var(--navy-900)' }}
+                      >
+                        {formatRupiah(String(Math.round(v.total_spend)))}
+                      </p>
+                      <p className="text-[11px] text-slate-400">{fmtDate(v.last_visit)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Top customers */}
+          <div className="rounded-xl border bg-white overflow-hidden">
+            <div className="px-4 py-2.5 border-b flex items-center gap-2" style={{ background: '#fafafa' }}>
+              <div
+                className="w-5 h-5 rounded-[6px] flex items-center justify-center"
+                style={{ background: 'var(--navy-50)', color: 'var(--navy-800)' }}
+              >
+                <Users className="h-3 w-3" />
+              </div>
+              <span className="text-[11.5px] font-[550] text-slate-500 uppercase tracking-[0.04em]">
+                Pelanggan Teratas
+              </span>
+            </div>
+            {opLoading ? (
+              <div className="divide-y">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center justify-between px-4 py-2.5">
+                    <Skeleton className="h-3.5 w-32 rounded" />
+                    <Skeleton className="h-3.5 w-20 rounded" />
+                  </div>
+                ))}
+              </div>
+            ) : (operational?.top_customers?.length ?? 0) === 0 ? (
+              <p className="px-4 py-8 text-[13px] text-slate-400 text-center">
+                Belum ada data pelanggan
+              </p>
+            ) : (
+              <div className="divide-y">
+                {(operational?.top_customers ?? []).map((c, i) => (
+                  <div
+                    key={c.id}
+                    className="grid items-center px-4 py-2.5"
+                    style={{ gridTemplateColumns: '1fr 64px 130px' }}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-[650] flex-shrink-0"
+                        style={{ background: 'var(--navy-50)', color: 'var(--navy-800)' }}
+                      >
+                        {i + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <span className="text-[13px] truncate block" style={{ color: 'var(--navy-900)' }}>
+                          {c.name}
+                        </span>
+                        <span className="text-[11px] text-slate-400">{c.vehicles} kendaraan</span>
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <span
+                        className="text-[13px] font-[600]"
+                        style={{ fontFamily: 'ui-monospace, monospace', color: 'var(--navy-900)' }}
+                      >
+                        {c.visits}×
+                      </span>
+                    </div>
+                    <div
+                      className="text-right text-[12.5px] font-[600]"
+                      style={{ fontFamily: 'ui-monospace, monospace', color: 'var(--navy-900)' }}
+                    >
+                      {formatRupiah(String(Math.round(c.total_spend)))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
