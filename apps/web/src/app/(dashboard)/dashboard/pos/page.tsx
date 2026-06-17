@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import {
   Plus,
   Minus,
@@ -26,6 +25,7 @@ import { useProducts } from '@/hooks/use-products';
 import { useServices } from '@/hooks/use-services';
 import { usePackages } from '@/hooks/use-packages';
 import { useCreateTransaction } from '@/hooks/use-transactions';
+import { useCart } from '@/hooks/use-cart';
 import type { Vehicle } from '@/lib/api/vehicles';
 import type { Product } from '@/lib/api/products';
 import type { Service } from '@/lib/api/services';
@@ -47,18 +47,6 @@ import {
 } from '@/components/ui/dialog';
 
 type ItemTab = 'PRODUCT' | 'SERVICE' | 'PACKAGE' | 'EXTERNAL';
-
-interface CartItem {
-  key: string;
-  item_type: ItemTab;
-  item_id?: number;
-  item_name: string;
-  base_price: number;
-  qty: number;
-  // Available units for a catalog PRODUCT; undefined = unlimited (SERVICE / PACKAGE / EXTERNAL).
-  // Client-side cap only — the server remains the source of truth at checkout.
-  stock?: number;
-}
 
 const TABS: Array<{ value: ItemTab; label: string }> = [
   { value: 'PRODUCT', label: 'Produk' },
@@ -167,7 +155,8 @@ export default function PosPage() {
   // Items
   const [activeTab, setActiveTab] = useState<ItemTab>('PRODUCT');
   const [itemSearch, setItemSearch] = useState('');
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const { cart, addToCart, updateQty, removeFromCart, clearCart, subtotal } =
+    useCart();
 
   // External item form
   const [extName, setExtName] = useState('');
@@ -207,10 +196,6 @@ export default function PosPage() {
     : [];
   const packages = packagesData?.packages ?? [];
 
-  const subtotal = cart.reduce(
-    (sum, item) => sum + item.base_price * item.qty,
-    0
-  );
   const discountAmt = parseFloat(discount) || 0;
   const total = Math.max(0, subtotal - discountAmt);
   // Empty field = "uang pas" (pay full). An explicit 0 stays 0 so a partial/unpaid
@@ -233,45 +218,6 @@ export default function PosPage() {
     io.observe(el);
     return () => io.disconnect();
   }, [successTrxId]);
-
-  function addToCart(item: Omit<CartItem, 'key' | 'qty'>) {
-    const key = `${item.item_type}-${item.item_id ?? item.item_name}`;
-    const existing = cart.find(c => c.key === key);
-    if (existing && existing.stock != null && existing.qty >= existing.stock) {
-      toast.error(`Stok ${existing.item_name} tinggal ${existing.stock}`);
-      return;
-    }
-    setCart(prev => {
-      const ex = prev.find(c => c.key === key);
-      if (ex) {
-        return prev.map(c => (c.key === key ? { ...c, qty: c.qty + 1 } : c));
-      }
-      return [...prev, { ...item, key, qty: 1 }];
-    });
-  }
-
-  function updateQty(key: string, delta: number) {
-    if (delta > 0) {
-      const c = cart.find(x => x.key === key);
-      if (c && c.stock != null && c.qty >= c.stock) {
-        toast.error(`Stok ${c.item_name} tinggal ${c.stock}`);
-        return;
-      }
-    }
-    setCart(prev =>
-      prev
-        .map(c => (c.key === key ? { ...c, qty: c.qty + delta } : c))
-        .filter(c => c.qty > 0)
-    );
-  }
-
-  function removeFromCart(key: string) {
-    setCart(prev => prev.filter(c => c.key !== key));
-  }
-
-  function clearCart() {
-    setCart([]);
-  }
 
   function selectVehicle(v: Vehicle) {
     setSelectedVehicle(v);
@@ -381,7 +327,7 @@ export default function PosPage() {
             variant="ghost"
             onClick={() => {
               setSuccessTrxId(null);
-              setCart([]);
+              clearCart();
               clearVehicle();
               setDiscount('');
               setNotes('');
