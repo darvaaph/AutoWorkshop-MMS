@@ -180,8 +180,8 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="rounded-xl border bg-white overflow-hidden">
+      {/* Table — desktop */}
+      <div className="hidden md:block rounded-xl border bg-white overflow-hidden">
         {/* Table header */}
         <div
           className="grid text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em] px-4 py-2.5 border-b"
@@ -292,6 +292,81 @@ export default function CustomersPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+      </div>
+
+      {/* Cards — mobile */}
+      <div className="md:hidden">
+        {isLoading ? (
+          <div className="space-y-2.5">
+            {[1, 2, 3, 4, 5].map(i => (
+              <Skeleton key={i} className="h-[68px] w-full rounded-xl" />
+            ))}
+          </div>
+        ) : !customers || customers.length === 0 ? (
+          <div className="rounded-xl border bg-white py-16 text-center">
+            <User className="h-10 w-10 mx-auto mb-3 text-slate-300" />
+            <p className="text-sm text-slate-400">
+              {search
+                ? 'Tidak ada hasil untuk pencarian ini.'
+                : 'Belum ada pelanggan.'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {customers.map(c => (
+              <div
+                key={c.id}
+                className="rounded-xl border bg-white p-3.5 flex items-center gap-3"
+              >
+                <Avatar name={c.name} photoUrl={getImageUrl(c.photo_url)} />
+                <div className="min-w-0 flex-1">
+                  <p
+                    className="text-[13.5px] font-semibold truncate"
+                    style={{ color: 'var(--navy-900)' }}
+                  >
+                    {c.name}
+                  </p>
+                  <p
+                    className="text-[12px] text-slate-600 truncate"
+                    style={{ fontFamily: 'ui-monospace, monospace' }}
+                  >
+                    {c.phone}
+                  </p>
+                  {c.address && (
+                    <p className="text-[11.5px] text-slate-400 truncate mt-0.5">
+                      {c.address}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-slate-400 hover:text-slate-700"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-slate-400 hover:text-slate-700"
+                    onClick={() => openEdit(c)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-red-400 hover:text-red-600"
+                    onClick={() => setDeleteTarget(c)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

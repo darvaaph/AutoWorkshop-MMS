@@ -43,7 +43,7 @@ export function Header() {
   const initials = user?.full_name ? getInitials(user.full_name) : 'U';
 
   return (
-    <header className="h-[61px] border-b flex items-center justify-between px-6 bg-white sticky top-0 z-40 flex-shrink-0 gap-4">
+    <header className="h-[61px] border-b flex items-center justify-between px-4 md:px-6 bg-white sticky top-0 z-40 flex-shrink-0 gap-4">
       {/* Search — desktop only */}
       <div className="relative hidden md:flex items-center w-64">
         <Search className="absolute left-3 h-4 w-4 text-slate-400 pointer-events-none" />

@@ -196,8 +196,8 @@ export default function TransactionsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap items-center">
-        <div className="relative flex-1 min-w-48 max-w-sm">
+      <div className="space-y-2.5">
+        <div className="relative w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             className="pl-9 h-[38px]"
@@ -206,34 +206,38 @@ export default function TransactionsPage() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex gap-1.5">
-          {FILTER_STATUSES.map(f => (
-            <button
-              key={f.value}
-              onClick={() => setStatusFilter(f.value as TransactionStatus | '')}
-              className="h-[38px] px-3 rounded-[10px] text-[12.5px] font-[550] border transition-all"
-              style={
-                statusFilter === f.value
-                  ? {
-                      background: 'var(--navy-800)',
-                      color: '#fff',
-                      borderColor: 'var(--navy-800)',
-                    }
-                  : {
-                      background: '#fff',
-                      color: '#64748b',
-                      borderColor: '#e2e8f0',
-                    }
-              }
-            >
-              {f.label}
-            </button>
-          ))}
+        <div className="-mx-4 px-4 overflow-x-auto md:mx-0 md:px-0">
+          <div className="flex gap-1.5 flex-nowrap">
+            {FILTER_STATUSES.map(f => (
+              <button
+                key={f.value}
+                onClick={() =>
+                  setStatusFilter(f.value as TransactionStatus | '')
+                }
+                className="h-[38px] px-3 rounded-[10px] text-[12.5px] font-[550] border transition-all flex-shrink-0"
+                style={
+                  statusFilter === f.value
+                    ? {
+                        background: 'var(--navy-800)',
+                        color: '#fff',
+                        borderColor: 'var(--navy-800)',
+                      }
+                    : {
+                        background: '#fff',
+                        color: '#64748b',
+                        borderColor: '#e2e8f0',
+                      }
+                }
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="rounded-xl border bg-white overflow-hidden">
+      {/* Table — desktop */}
+      <div className="hidden md:block rounded-xl border bg-white overflow-hidden">
         <div
           className="grid text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em] px-4 py-2.5 border-b"
           style={{
@@ -342,6 +346,96 @@ export default function TransactionsPage() {
                       size="icon"
                       className="h-8 w-8 text-red-400 hover:text-red-600"
                       onClick={() => setCancelTarget(t)}
+                    >
+                      <Ban className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Cards — mobile */}
+      <div className="md:hidden">
+        {isLoading ? (
+          <div className="space-y-2.5">
+            {[1, 2, 3, 4, 5].map(i => (
+              <Skeleton key={i} className="h-[72px] w-full rounded-xl" />
+            ))}
+          </div>
+        ) : transactions.length === 0 ? (
+          <div className="rounded-xl border bg-white py-16 text-center">
+            <Receipt className="h-10 w-10 mx-auto mb-3 text-slate-300" />
+            <p className="text-sm text-slate-400">
+              {search || statusFilter
+                ? 'Tidak ada hasil untuk filter ini.'
+                : 'Belum ada transaksi.'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {transactions.map(t => (
+              <div
+                key={t.id}
+                className="rounded-xl border bg-white p-3.5 active:bg-slate-50 transition-colors cursor-pointer"
+                style={{ opacity: t.status === 'CANCELLED' ? 0.55 : 1 }}
+                onClick={() => setSelectedId(t.id)}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {t.vehicle ? (
+                      <LicensePlate plate={t.vehicle.license_plate} />
+                    ) : (
+                      <span className="text-[13px] text-slate-400 flex-shrink-0">
+                        Walk-in
+                      </span>
+                    )}
+                    <span
+                      className="text-[13px] font-[550] truncate"
+                      style={{ color: 'var(--navy-900)' }}
+                    >
+                      {t.vehicle?.customer?.name ?? '—'}
+                    </span>
+                  </div>
+                  <StatusBadge status={t.status} />
+                </div>
+
+                <div className="flex items-center justify-between gap-2 mt-2">
+                  <span
+                    className="text-[11px] text-slate-400 truncate"
+                    style={{ fontFamily: 'ui-monospace, monospace' }}
+                  >
+                    #{t.id} · {formatDate(t.date)}
+                  </span>
+                  <span
+                    className="text-[13px] font-[600] flex-shrink-0"
+                    style={{
+                      fontFamily: 'ui-monospace, monospace',
+                      color: 'var(--navy-900)',
+                    }}
+                  >
+                    {formatRupiah(t.total_amount)}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 mt-1.5">
+                  <span className="text-[11.5px] text-slate-500 truncate">
+                    {t.vehicle
+                      ? `${t.vehicle.brand} ${t.vehicle.model}`
+                      : '—'}
+                    {t.mechanic ? ` · ${t.mechanic.name}` : ''}
+                  </span>
+                  {isAdmin && t.status !== 'CANCELLED' && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 -mr-1.5 text-red-400 hover:text-red-600 flex-shrink-0"
+                      onClick={e => {
+                        e.stopPropagation();
+                        setCancelTarget(t);
+                      }}
                     >
                       <Ban className="h-3.5 w-3.5" />
                     </Button>

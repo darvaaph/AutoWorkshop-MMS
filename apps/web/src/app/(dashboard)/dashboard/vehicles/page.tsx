@@ -230,7 +230,7 @@ export default function VehiclesPage() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 -mx-4 px-4 overflow-x-auto sm:mx-0 sm:px-0">
           {(
             [
               { key: 'all', label: 'Semua' },
@@ -241,7 +241,7 @@ export default function VehiclesPage() {
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
-              className="h-[38px] px-3 rounded-[10px] text-[13px] font-[550] border transition-all"
+              className="h-[38px] px-3 rounded-[10px] text-[13px] font-[550] border transition-all flex-shrink-0"
               style={
                 filter === f.key
                   ? {
@@ -469,7 +469,7 @@ export default function VehiclesPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Plat Nomor</Label>
                 <Input
@@ -488,7 +488,7 @@ export default function VehiclesPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Merek</Label>
                 <Input {...register('brand')} placeholder="Toyota" />
@@ -509,7 +509,7 @@ export default function VehiclesPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Tgl Servis Berikutnya</Label>
                 <Input type="date" {...register('next_service_date')} />

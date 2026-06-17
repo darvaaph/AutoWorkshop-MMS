@@ -150,8 +150,8 @@ export default function ProductsPage() {
       </div>
 
       {/* Search + category filter */}
-      <div className="flex gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-48 max-w-sm">
+      <div className="space-y-2.5">
+        <div className="relative w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             className="pl-9 h-[38px]"
@@ -160,30 +160,32 @@ export default function ProductsPage() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        {categories.length > 0 && (
-          <select
-            value={category}
-            onChange={e => setCategory(e.target.value)}
-            className="h-[38px] border border-input rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            <option value="">Semua Kategori</option>
-            {categories.map(cat => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
+        <div className="flex gap-2">
+          {categories.length > 0 && (
+            <select
+              value={category}
+              onChange={e => setCategory(e.target.value)}
+              className="h-[38px] flex-1 sm:flex-none border border-input rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Semua Kategori</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          )}
+          <select className="h-[38px] flex-1 sm:flex-none border border-input rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-ring">
+            <option>Semua Status</option>
+            <option>Stok Normal</option>
+            <option>Stok Menipis</option>
+            <option>Habis</option>
           </select>
-        )}
-        <select className="h-[38px] border border-input rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-ring">
-          <option>Semua Status</option>
-          <option>Stok Normal</option>
-          <option>Stok Menipis</option>
-          <option>Habis</option>
-        </select>
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="rounded-xl border bg-white overflow-hidden">
+      {/* Table — desktop */}
+      <div className="hidden md:block rounded-xl border bg-white overflow-hidden">
         {/* Header */}
         <div
           className="grid text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em] px-4 py-2.5 border-b"
@@ -355,6 +357,137 @@ export default function ProductsPage() {
         )}
       </div>
 
+      {/* Cards — mobile */}
+      <div className="md:hidden">
+        {isLoading ? (
+          <div className="space-y-2.5">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <Skeleton key={i} className="h-[76px] w-full rounded-xl" />
+            ))}
+          </div>
+        ) : products.length === 0 ? (
+          <div className="rounded-xl border bg-white py-16 text-center">
+            <Package className="h-10 w-10 mx-auto mb-3 text-slate-300" />
+            <p className="text-sm text-slate-400">
+              {search || category
+                ? 'Tidak ada hasil untuk filter ini.'
+                : 'Belum ada produk.'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {products.map(p => {
+              const low = p.stock <= p.min_stock_alert;
+              const out = p.stock === 0;
+              return (
+                <div
+                  key={p.id}
+                  className="rounded-xl border bg-white p-3.5 flex gap-3"
+                >
+                  <div
+                    className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
+                    style={{
+                      background:
+                        'repeating-linear-gradient(135deg, #f1f5f9 0 6px, #f8fafc 6px 12px)',
+                    }}
+                  >
+                    {p.image_url ? (
+                      <img
+                        src={getImageUrl(p.image_url) ?? ''}
+                        alt={p.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <Package className="h-5 w-5 text-slate-300" />
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <span
+                        className="text-[13.5px] font-[550] truncate"
+                        style={{ color: 'var(--navy-900)' }}
+                      >
+                        {p.name}
+                      </span>
+                      <span
+                        className="text-[13px] font-semibold flex-shrink-0"
+                        style={{
+                          fontFamily: 'ui-monospace, monospace',
+                          color: 'var(--navy-900)',
+                        }}
+                      >
+                        {formatRupiah(p.price_sell)}
+                      </span>
+                    </div>
+
+                    <div
+                      className="text-[11px] text-slate-400 truncate mt-0.5"
+                      style={{ fontFamily: 'ui-monospace, monospace' }}
+                    >
+                      {p.sku}
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span
+                        className="inline-flex items-center h-[20px] px-2 rounded-full text-[11px] font-semibold border"
+                        style={{
+                          background: '#f8fafc',
+                          color: '#64748b',
+                          borderColor: '#e2e8f0',
+                        }}
+                      >
+                        {p.category}
+                      </span>
+                      <span
+                        className="text-[11.5px] font-semibold"
+                        style={{
+                          fontFamily: 'ui-monospace, monospace',
+                          color: out
+                            ? '#b91c1c'
+                            : low
+                            ? '#92400e'
+                            : '#64748b',
+                        }}
+                      >
+                        Stok {p.stock}
+                      </span>
+                      {out ? (
+                        <span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-700 border border-red-200">
+                          Habis
+                        </span>
+                      ) : low ? (
+                        <span className="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                          Menipis
+                        </span>
+                      ) : null}
+                      <div className="flex items-center gap-1 ml-auto">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-400 hover:text-slate-700"
+                          onClick={() => openEdit(p)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-400 hover:text-red-600"
+                          onClick={() => setDeleteTarget(p)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Add/Edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -386,7 +519,7 @@ export default function ProductsPage() {
               </label>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>SKU</Label>
                 <Input {...register('sku')} />
@@ -422,7 +555,7 @@ export default function ProductsPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Harga Beli</Label>
                 <Input type="number" min={0} {...register('price_buy')} />
@@ -443,7 +576,7 @@ export default function ProductsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Stok</Label>
                 <Input type="number" min={0} {...register('stock')} />

@@ -110,7 +110,7 @@ function StatCard({
               </div>
             </div>
             <div
-              className="text-[26px] font-[650] tracking-[-0.025em] leading-none mb-2"
+              className="text-[20px] md:text-[26px] font-[650] tracking-[-0.025em] leading-none mb-2 truncate"
               style={{
                 color: 'var(--navy-900)',
                 fontFamily: 'ui-monospace, monospace',
@@ -281,7 +281,7 @@ export default function DashboardPage() {
       {/* Pelanggan/Kendaraan + Produk/Stok row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
         <Card>
-          <CardContent className="p-4 flex items-center gap-5">
+          <CardContent className="p-4 flex items-center gap-3 md:gap-5">
             <div className="flex items-center gap-3 flex-1">
               <div
                 className="w-10 h-10 rounded-[10px] flex items-center justify-center"
@@ -345,7 +345,7 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <CardContent className="p-4 flex items-center gap-5">
+          <CardContent className="p-4 flex items-center gap-3 md:gap-5">
             <div className="flex items-center gap-3 flex-1">
               <div className="w-10 h-10 rounded-[10px] flex items-center justify-center bg-slate-100 text-slate-600">
                 <Package className="h-[18px] w-[18px]" />
