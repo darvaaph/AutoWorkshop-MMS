@@ -122,8 +122,14 @@ export async function getTransactionsApi(params?: {
 }
 
 export async function getTransactionApi(id: number): Promise<Transaction> {
-  const res = await apiClient.get<{ data: Transaction }>(`/transactions/${id}`);
-  return res.data.data;
+  const res = await apiClient.get<{
+    data: {
+      transaction: Omit<Transaction, 'payment_summary'>;
+      payment_summary: Transaction['payment_summary'];
+    };
+  }>(`/transactions/${id}`);
+  const { transaction, payment_summary } = res.data.data;
+  return { ...transaction, payment_summary };
 }
 
 export async function createTransactionApi(

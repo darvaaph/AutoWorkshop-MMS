@@ -93,13 +93,13 @@ const paymentSchema = z.object({
 type PaymentForm = z.infer<typeof paymentSchema>;
 
 function StatusBadge({ status }: { status: TransactionStatus }) {
-  const s = STATUS_STYLE[status];
+  const s = STATUS_STYLE[status] ?? { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' };
   return (
     <span
       className="inline-flex items-center h-[22px] px-2 rounded-full text-[11.5px] font-semibold border"
       style={{ background: s.bg, color: s.color, borderColor: s.border }}
     >
-      {STATUS_LABELS[status]}
+      {STATUS_LABELS[status] ?? status}
     </span>
   );
 }
@@ -525,7 +525,7 @@ export default function TransactionsPage() {
                   Item
                 </p>
                 <div className="divide-y rounded-[10px] border overflow-hidden">
-                  {detail.items.map(item => (
+                  {(detail.items ?? []).map(item => (
                     <div
                       key={item.id}
                       className="flex items-center justify-between px-3 py-2.5 bg-white"
@@ -595,13 +595,13 @@ export default function TransactionsPage() {
               </div>
 
               {/* Payments */}
-              {detail.payments.length > 0 && (
+              {(detail.payments ?? []).length > 0 && (
                 <div>
                   <p className="text-[11.5px] font-[550] text-slate-400 uppercase tracking-[0.04em] mb-2">
                     Pembayaran
                   </p>
                   <div className="divide-y rounded-[10px] border overflow-hidden">
-                    {detail.payments.map(p => (
+                    {(detail.payments ?? []).map(p => (
                       <div
                         key={p.id}
                         className="flex items-center justify-between px-3 py-2.5 bg-white"
