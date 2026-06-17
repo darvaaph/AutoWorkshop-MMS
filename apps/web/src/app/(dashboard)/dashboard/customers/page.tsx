@@ -1,7 +1,7 @@
 'use client';
 
 import { type ChangeEvent, useState } from 'react';
-import { Plus, Search, Pencil, Trash2, User, Eye, Filter } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, User, Filter } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -269,13 +269,6 @@ export default function CustomersPage() {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-slate-400 hover:text-slate-700"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-slate-400 hover:text-slate-700"
                       onClick={() => openEdit(c)}
                     >
                       <Pencil className="h-3.5 w-3.5" />
@@ -341,13 +334,6 @@ export default function CustomersPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-0.5 flex-shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-slate-400 hover:text-slate-700"
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
