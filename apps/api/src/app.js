@@ -39,14 +39,9 @@ app.use((req, res) => {
     });
 });
 
-// Global Error Handler
-app.use((err, req, res, next) => {
-    console.error('❌ Error:', err);
-    res.status(err.status || 500).json({ 
-        success: false, 
-        message: err.message || 'Internal Server Error' 
-    });
-});
+// Global Error Handler (consistent JSON shape + Sequelize error mapping)
+const errorHandler = require('./middleware/error.middleware');
+app.use(errorHandler);
 
 // Start the server with database connection
 const startServer = async () => {

@@ -19,6 +19,7 @@ import { useAuditLogs } from '@/hooks/use-audit-logs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatDateTime } from '@/lib/format';
 
 /* ── Helpers ── */
 
@@ -96,16 +97,6 @@ function ActionBadge({ action }: { action: string }) {
       {cfg.label}
     </span>
   );
-}
-
-function formatDateTime(iso: string) {
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(iso));
 }
 
 function safeParseJson(val: unknown): Record<string, unknown> | null {

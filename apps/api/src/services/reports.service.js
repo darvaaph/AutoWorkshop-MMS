@@ -9,10 +9,7 @@ const Product = require('../models/product.model');
 const Vehicle = require('../models/vehicle.model');
 const Customer = require('../models/customer.model');
 const Mechanic = require('../models/mechanic.model');
-
-// Transactions counted as finalized sales/revenue across all reports & dashboard.
-// Excludes PENDING (bon sementara / rawat inap — not a sale until closed) and CANCELLED.
-const SALE_STATUSES = ['UNPAID', 'PARTIAL', 'PAID'];
+const { SALE_STATUSES } = require('../utils/constants');
 
 class ReportsService {
     /**

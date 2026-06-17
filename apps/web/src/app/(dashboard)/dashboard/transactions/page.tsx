@@ -17,7 +17,7 @@ import type {
   TransactionStatus,
   PaymentMethod,
 } from '@/lib/api/transactions';
-import { formatRupiah } from '@/lib/format';
+import { formatRupiah, formatDateTime } from '@/lib/format';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -120,18 +120,6 @@ function LicensePlate({ plate }: { plate: string }) {
   );
 }
 
-function formatDate(iso: string | null | undefined) {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '-';
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(d);
-}
 
 export default function TransactionsPage() {
   const user = useAuthStore(s => s.user);
@@ -287,7 +275,7 @@ export default function TransactionsPage() {
                     className="text-[11.5px] text-slate-500"
                     style={{ fontFamily: 'ui-monospace, monospace' }}
                   >
-                    {formatDate(t.date)}
+                    {formatDateTime(t.date)}
                   </div>
                   <div
                     className="text-[10.5px] text-slate-400 mt-0.5"
@@ -407,7 +395,7 @@ export default function TransactionsPage() {
                     className="text-[11px] text-slate-400 truncate"
                     style={{ fontFamily: 'ui-monospace, monospace' }}
                   >
-                    #{t.id} · {formatDate(t.date)}
+                    #{t.id} · {formatDateTime(t.date)}
                   </span>
                   <span
                     className="text-[13px] font-[600] flex-shrink-0"
@@ -475,7 +463,7 @@ export default function TransactionsPage() {
                     #{detail.id}
                   </p>
                   <p className="text-[12.5px] text-slate-500 mt-0.5">
-                    {formatDate(detail.date)}
+                    {formatDateTime(detail.date)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -611,7 +599,7 @@ export default function TransactionsPage() {
                             {PAYMENT_METHOD_LABELS[p.payment_method]}
                           </p>
                           <p className="text-[11px] text-slate-400">
-                            {formatDate(p.date)}
+                            {formatDateTime(p.date)}
                             {p.reference_number
                               ? ` · ${p.reference_number}`
                               : ''}

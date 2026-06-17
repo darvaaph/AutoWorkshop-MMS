@@ -9,263 +9,246 @@ const Product = require('../models/product.model');
 const Service = require('../models/service.model');
 const { sequelize } = require('../config/database');
 const auditService = require('../services/audit.service');
+const asyncHandler = require('../utils/async-handler');
 
 /**
  * Get all packages with items detail
  * GET /api/packages?search=paket&active_only=true
  */
-exports.getAllPackages = async (req, res) => {
-    try {
-        const { search, active_only = 'true', page = 1, limit = 50 } = req.query;
+exports.getAllPackages = asyncHandler(async (req, res) => {
+    const { search, active_only = 'true', page = 1, limit = 50 } = req.query;
 
-        const where = {
-            deleted_at: null
-        };
+    const where = {
+        deleted_at: null
+    };
 
-        if (search) {
-            where.name = { [Op.like]: `%${search}%` };
-        }
+    if (search) {
+        where.name = { [Op.like]: `%${search}%` };
+    }
 
-        if (active_only === 'true') {
-            where.is_active = true;
-        }
+    if (active_only === 'true') {
+        where.is_active = true;
+    }
 
-        const offset = (parseInt(page) - 1) * parseInt(limit);
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
-        const { count, rows: packages } = await Package.findAndCountAll({
-            where,
-            order: [['name', 'ASC']],
-            limit: parseInt(limit),
-            offset,
-            attributes: ['id', 'name', 'price', 'description', 'is_active', 'image_url', 'createdAt', 'updatedAt'],
-            include: [
-                {
-                    model: PackageItem,
-                    as: 'items',
-                    include: [
-                        {
-                            model: Product,
-                            as: 'product',
-                            attributes: ['id', 'sku', 'name', 'price_sell', 'price_buy', 'stock'],
-                            required: false
-                        },
-                        {
-                            model: Service,
-                            as: 'service',
-                            attributes: ['id', 'name', 'price'],
-                            required: false
-                        }
-                    ]
-                }
-            ]
-        });
-
-        // Calculate package details (total component value, margin, stock availability)
-        const packagesWithDetails = packages.map(pkg => {
-            const packageData = pkg.toJSON();
-            
-            let totalComponentValue = 0;
-            let totalComponentSellPrice = 0;
-            let isAvailable = true;
-            let unavailableReason = null;
-
-            packageData.items.forEach(item => {
-                if (item.product) {
-                    // Product component
-                    totalComponentValue += parseFloat(item.product.price_buy || 0) * item.qty;
-                    totalComponentSellPrice += parseFloat(item.product.price_sell || 0) * item.qty;
-                    
-                    // Check stock availability
-                    if (item.product.stock < item.qty) {
-                        isAvailable = false;
-                        unavailableReason = `Stok ${item.product.name} tidak cukup (butuh: ${item.qty}, tersedia: ${item.product.stock})`;
+    const { count, rows: packages } = await Package.findAndCountAll({
+        where,
+        order: [['name', 'ASC']],
+        limit: parseInt(limit),
+        offset,
+        attributes: ['id', 'name', 'price', 'description', 'is_active', 'image_url', 'createdAt', 'updatedAt'],
+        include: [
+            {
+                model: PackageItem,
+                as: 'items',
+                include: [
+                    {
+                        model: Product,
+                        as: 'product',
+                        attributes: ['id', 'sku', 'name', 'price_sell', 'price_buy', 'stock'],
+                        required: false
+                    },
+                    {
+                        model: Service,
+                        as: 'service',
+                        attributes: ['id', 'name', 'price'],
+                        required: false
                     }
-                } else if (item.service) {
-                    // Service component (no stock, just price)
-                    totalComponentSellPrice += parseFloat(item.service.price || 0) * item.qty;
-                } else {
+                ]
+            }
+        ]
+    });
+
+    // Calculate package details (total component value, margin, stock availability)
+    const packagesWithDetails = packages.map(pkg => {
+        const packageData = pkg.toJSON();
+
+        let totalComponentValue = 0;
+        let totalComponentSellPrice = 0;
+        let isAvailable = true;
+        let unavailableReason = null;
+
+        packageData.items.forEach(item => {
+            if (item.product) {
+                // Product component
+                totalComponentValue += parseFloat(item.product.price_buy || 0) * item.qty;
+                totalComponentSellPrice += parseFloat(item.product.price_sell || 0) * item.qty;
+
+                // Check stock availability
+                if (item.product.stock < item.qty) {
                     isAvailable = false;
-                    if (!unavailableReason) {
-                        if (item.product_id) {
-                            unavailableReason = `Produk komponen (ID: ${item.product_id}) sudah dihapus`;
-                        } else if (item.service_id) {
-                            unavailableReason = `Jasa komponen (ID: ${item.service_id}) sudah dihapus`;
-                        } else {
-                            unavailableReason = 'Komponen paket tidak valid';
-                        }
+                    unavailableReason = `Stok ${item.product.name} tidak cukup (butuh: ${item.qty}, tersedia: ${item.product.stock})`;
+                }
+            } else if (item.service) {
+                // Service component (no stock, just price)
+                totalComponentSellPrice += parseFloat(item.service.price || 0) * item.qty;
+            } else {
+                isAvailable = false;
+                if (!unavailableReason) {
+                    if (item.product_id) {
+                        unavailableReason = `Produk komponen (ID: ${item.product_id}) sudah dihapus`;
+                    } else if (item.service_id) {
+                        unavailableReason = `Jasa komponen (ID: ${item.service_id}) sudah dihapus`;
+                    } else {
+                        unavailableReason = 'Komponen paket tidak valid';
                     }
-                }
-            });
-
-            // Calculate margin
-            const packagePrice = parseFloat(packageData.price);
-            const margin = packagePrice - totalComponentValue;
-            const marginPercent = totalComponentValue > 0 
-                ? ((margin / totalComponentValue) * 100).toFixed(2) 
-                : 0;
-
-            // Savings for customer
-            const savings = totalComponentSellPrice - packagePrice;
-            const savingsPercent = totalComponentSellPrice > 0 
-                ? ((savings / totalComponentSellPrice) * 100).toFixed(2) 
-                : 0;
-
-            return {
-                ...packageData,
-                calculated: {
-                    component_cost: totalComponentValue,
-                    component_retail_price: totalComponentSellPrice,
-                    margin: margin,
-                    margin_percent: parseFloat(marginPercent),
-                    customer_savings: savings,
-                    savings_percent: parseFloat(savingsPercent),
-                    is_available: isAvailable,
-                    unavailable_reason: unavailableReason,
-                    low_margin_alert: parseFloat(marginPercent) < 10
-                }
-            };
-        });
-
-        res.status(200).json({
-            success: true,
-            data: {
-                packages: packagesWithDetails,
-                pagination: {
-                    total: count,
-                    page: parseInt(page),
-                    limit: parseInt(limit),
-                    total_pages: Math.ceil(count / parseInt(limit))
                 }
             }
         });
-    } catch (error) {
-        console.error('Get packages error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error retrieving packages', 
-            error: error.message 
-        });
-    }
-};
+
+        // Calculate margin
+        const packagePrice = parseFloat(packageData.price);
+        const margin = packagePrice - totalComponentValue;
+        const marginPercent = totalComponentValue > 0
+            ? ((margin / totalComponentValue) * 100).toFixed(2)
+            : 0;
+
+        // Savings for customer
+        const savings = totalComponentSellPrice - packagePrice;
+        const savingsPercent = totalComponentSellPrice > 0
+            ? ((savings / totalComponentSellPrice) * 100).toFixed(2)
+            : 0;
+
+        return {
+            ...packageData,
+            calculated: {
+                component_cost: totalComponentValue,
+                component_retail_price: totalComponentSellPrice,
+                margin: margin,
+                margin_percent: parseFloat(marginPercent),
+                customer_savings: savings,
+                savings_percent: parseFloat(savingsPercent),
+                is_available: isAvailable,
+                unavailable_reason: unavailableReason,
+                low_margin_alert: parseFloat(marginPercent) < 10
+            }
+        };
+    });
+
+    res.status(200).json({
+        success: true,
+        data: {
+            packages: packagesWithDetails,
+            pagination: {
+                total: count,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total_pages: Math.ceil(count / parseInt(limit))
+            }
+        }
+    });
+});
 
 /**
  * Get single package by ID with full details
  * GET /api/packages/:id
  */
-exports.getPackageById = async (req, res) => {
-    try {
-        const { id } = req.params;
+exports.getPackageById = asyncHandler(async (req, res) => {
+    const { id } = req.params;
 
-        const pkg = await Package.findOne({
-            where: { id, deleted_at: null },
-            attributes: ['id', 'name', 'price', 'description', 'is_active', 'image_url', 'createdAt', 'updatedAt'],
-            include: [
-                {
-                    model: PackageItem,
-                    as: 'items',
-                    include: [
-                        {
-                            model: Product,
-                            as: 'product',
-                            attributes: ['id', 'sku', 'name', 'price_sell', 'price_buy', 'stock', 'category'],
-                            required: false
-                        },
-                        {
-                            model: Service,
-                            as: 'service',
-                            attributes: ['id', 'name', 'price'],
-                            required: false
-                        }
-                    ]
-                }
-            ]
-        });
-
-        if (!pkg) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'Package not found' 
-            });
-        }
-
-        // Calculate details
-        const packageData = pkg.toJSON();
-        let totalComponentValue = 0;
-        let totalComponentSellPrice = 0;
-        let isAvailable = true;
-        const stockIssues = [];
-
-        packageData.items.forEach(item => {
-            if (item.product) {
-                totalComponentValue += parseFloat(item.product.price_buy || 0) * item.qty;
-                totalComponentSellPrice += parseFloat(item.product.price_sell || 0) * item.qty;
-                
-                if (item.product.stock < item.qty) {
-                    isAvailable = false;
-                    stockIssues.push({
-                        product_id: item.product.id,
-                        product_name: item.product.name,
-                        required: item.qty,
-                        available: item.product.stock,
-                        shortage: item.qty - item.product.stock
-                    });
-                }
-            } else if (item.service) {
-                totalComponentSellPrice += parseFloat(item.service.price || 0) * item.qty;
-            } else {
-                isAvailable = false;
-                if (item.product_id) {
-                    stockIssues.push({
-                        product_id: item.product_id,
-                        status: 'DELETED',
-                        message: `Produk komponen (ID: ${item.product_id}) sudah dihapus`
-                    });
-                } else if (item.service_id) {
-                    stockIssues.push({
-                        service_id: item.service_id,
-                        status: 'DELETED',
-                        message: `Jasa komponen (ID: ${item.service_id}) sudah dihapus`
-                    });
-                } else {
-                    stockIssues.push({
-                        status: 'INVALID',
-                        message: 'Komponen paket tidak valid'
-                    });
-                }
+    const pkg = await Package.findOne({
+        where: { id, deleted_at: null },
+        attributes: ['id', 'name', 'price', 'description', 'is_active', 'image_url', 'createdAt', 'updatedAt'],
+        include: [
+            {
+                model: PackageItem,
+                as: 'items',
+                include: [
+                    {
+                        model: Product,
+                        as: 'product',
+                        attributes: ['id', 'sku', 'name', 'price_sell', 'price_buy', 'stock', 'category'],
+                        required: false
+                    },
+                    {
+                        model: Service,
+                        as: 'service',
+                        attributes: ['id', 'name', 'price'],
+                        required: false
+                    }
+                ]
             }
-        });
+        ]
+    });
 
-        const packagePrice = parseFloat(packageData.price);
-        const margin = packagePrice - totalComponentValue;
-        const marginPercent = totalComponentValue > 0 
-            ? ((margin / totalComponentValue) * 100).toFixed(2) 
-            : 0;
-
-        res.status(200).json({
-            success: true,
-            data: {
-                ...packageData,
-                calculated: {
-                    component_cost: totalComponentValue,
-                    component_retail_price: totalComponentSellPrice,
-                    margin: margin,
-                    margin_percent: parseFloat(marginPercent),
-                    customer_savings: totalComponentSellPrice - packagePrice,
-                    is_available: isAvailable,
-                    stock_issues: stockIssues,
-                    low_margin_alert: parseFloat(marginPercent) < 10
-                }
-            }
-        });
-    } catch (error) {
-        console.error('Get package error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error retrieving package', 
-            error: error.message 
+    if (!pkg) {
+        return res.status(404).json({
+            success: false,
+            message: 'Package not found'
         });
     }
-};
+
+    // Calculate details
+    const packageData = pkg.toJSON();
+    let totalComponentValue = 0;
+    let totalComponentSellPrice = 0;
+    let isAvailable = true;
+    const stockIssues = [];
+
+    packageData.items.forEach(item => {
+        if (item.product) {
+            totalComponentValue += parseFloat(item.product.price_buy || 0) * item.qty;
+            totalComponentSellPrice += parseFloat(item.product.price_sell || 0) * item.qty;
+
+            if (item.product.stock < item.qty) {
+                isAvailable = false;
+                stockIssues.push({
+                    product_id: item.product.id,
+                    product_name: item.product.name,
+                    required: item.qty,
+                    available: item.product.stock,
+                    shortage: item.qty - item.product.stock
+                });
+            }
+        } else if (item.service) {
+            totalComponentSellPrice += parseFloat(item.service.price || 0) * item.qty;
+        } else {
+            isAvailable = false;
+            if (item.product_id) {
+                stockIssues.push({
+                    product_id: item.product_id,
+                    status: 'DELETED',
+                    message: `Produk komponen (ID: ${item.product_id}) sudah dihapus`
+                });
+            } else if (item.service_id) {
+                stockIssues.push({
+                    service_id: item.service_id,
+                    status: 'DELETED',
+                    message: `Jasa komponen (ID: ${item.service_id}) sudah dihapus`
+                });
+            } else {
+                stockIssues.push({
+                    status: 'INVALID',
+                    message: 'Komponen paket tidak valid'
+                });
+            }
+        }
+    });
+
+    const packagePrice = parseFloat(packageData.price);
+    const margin = packagePrice - totalComponentValue;
+    const marginPercent = totalComponentValue > 0
+        ? ((margin / totalComponentValue) * 100).toFixed(2)
+        : 0;
+
+    res.status(200).json({
+        success: true,
+        data: {
+            ...packageData,
+            calculated: {
+                component_cost: totalComponentValue,
+                component_retail_price: totalComponentSellPrice,
+                margin: margin,
+                margin_percent: parseFloat(marginPercent),
+                customer_savings: totalComponentSellPrice - packagePrice,
+                is_available: isAvailable,
+                stock_issues: stockIssues,
+                low_margin_alert: parseFloat(marginPercent) < 10
+            }
+        }
+    });
+});
 
 /**
  * Create new package with items
@@ -280,7 +263,7 @@ exports.getPackageById = async (req, res) => {
  *   ]
  * }
  */
-exports.createPackage = async (req, res) => {
+exports.createPackage = asyncHandler(async (req, res) => {
     const t = await sequelize.transaction();
 
     try {
@@ -415,21 +398,18 @@ exports.createPackage = async (req, res) => {
             data: completePackage
         });
     } catch (error) {
-        await t.rollback();
-        console.error('Create package error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error creating package', 
-            error: error.message 
-        });
+        if (t && !t.finished) {
+            try { await t.rollback(); } catch (rb) { console.error('Rollback error (createPackage):', rb); }
+        }
+        throw error;
     }
-};
+});
 
 /**
  * Update package
  * PUT /api/packages/:id
  */
-exports.updatePackage = async (req, res) => {
+exports.updatePackage = asyncHandler(async (req, res) => {
     const t = await sequelize.transaction();
 
     try {
@@ -442,9 +422,9 @@ exports.updatePackage = async (req, res) => {
 
         if (!pkg) {
             await t.rollback();
-            return res.status(404).json({ 
-                success: false, 
-                message: 'Package not found' 
+            return res.status(404).json({
+                success: false,
+                message: 'Package not found'
             });
         }
 
@@ -561,15 +541,15 @@ exports.updatePackage = async (req, res) => {
         };
 
         // Audit log
-        await auditService.logUpdate(req.user?.id, 'packages', pkg.id, 
+        await auditService.logUpdate(req.user?.id, 'packages', pkg.id,
             oldValues,
-            { 
-                name: pkg.name, 
-                price: pkg.price, 
+            {
+                name: pkg.name,
+                price: pkg.price,
                 description: pkg.description,
                 is_active: pkg.is_active,
                 image_url: pkg.image_url,
-                items_updated: items ? true : false 
+                items_updated: items ? true : false
             },
             req
         );
@@ -594,168 +574,147 @@ exports.updatePackage = async (req, res) => {
             data: updatedPackage
         });
     } catch (error) {
-        await t.rollback();
-        console.error('Update package error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error updating package', 
-            error: error.message 
-        });
+        if (t && !t.finished) {
+            try { await t.rollback(); } catch (rb) { console.error('Rollback error (updatePackage):', rb); }
+        }
+        throw error;
     }
-};
+});
 
 /**
  * Soft delete package
  * DELETE /api/packages/:id
  */
-exports.deletePackage = async (req, res) => {
-    try {
-        const { id } = req.params;
+exports.deletePackage = asyncHandler(async (req, res) => {
+    const { id } = req.params;
 
-        const pkg = await Package.findOne({
-            where: { id, deleted_at: null }
-        });
+    const pkg = await Package.findOne({
+        where: { id, deleted_at: null }
+    });
 
-        if (!pkg) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'Package not found' 
-            });
-        }
-
-        await pkg.destroy();
-
-        // Audit log
-        await auditService.logDelete(req.user?.id, 'packages', id, {
-            name: pkg.name, price: pkg.price
-        }, req);
-
-        res.status(200).json({
-            success: true,
-            message: 'Package deleted successfully'
-        });
-    } catch (error) {
-        console.error('Delete package error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error deleting package', 
-            error: error.message 
+    if (!pkg) {
+        return res.status(404).json({
+            success: false,
+            message: 'Package not found'
         });
     }
-};
+
+    await pkg.destroy();
+
+    // Audit log
+    await auditService.logDelete(req.user?.id, 'packages', id, {
+        name: pkg.name, price: pkg.price
+    }, req);
+
+    res.status(200).json({
+        success: true,
+        message: 'Package deleted successfully'
+    });
+});
 
 /**
  * Check package availability (stock validation)
  * GET /api/packages/:id/check-availability?qty=1
  */
-exports.checkPackageAvailability = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { qty = 1 } = req.query;
-        const requestedQty = parseInt(qty);
+exports.checkPackageAvailability = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { qty = 1 } = req.query;
+    const requestedQty = parseInt(qty);
 
-        const pkg = await Package.findOne({
-            where: { id, deleted_at: null, is_active: true },
-            include: [
-                {
-                    model: PackageItem,
-                    as: 'items',
-                    include: [
-                        {
-                            model: Product,
-                            as: 'product',
-                            attributes: ['id', 'name', 'stock', 'deletedAt'],
-                            paranoid: false
-                        }
-                    ]
-                }
-            ]
-        });
-
-        if (!pkg) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'Package not found or inactive' 
-            });
-        }
-
-        let isAvailable = true;
-        const stockDetails = [];
-
-        for (const item of pkg.items) {
-            if (item.product_id) {
-                // This is a product item, check availability
-                if (item.product) {
-                    // Additional check: verify if product is actually deleted
-                    const productCheck = await Product.findByPk(item.product.id, { paranoid: false });
-                    const isDeleted = productCheck && productCheck.deletedAt !== null;
-                    
-                    if (isDeleted) {
-                        // Product has been soft deleted
-                        stockDetails.push({
-                            product_id: item.product.id,
-                            product_name: item.product.name,
-                            status: 'DELETED',
-                            message: 'Product has been removed from inventory'
-                        });
-                        isAvailable = false;
-                    } else {
-                        // Product is active, check stock
-                        const requiredQty = item.qty * requestedQty;
-                        const available = item.product.stock >= requiredQty;
-                        
-                        stockDetails.push({
-                            product_id: item.product.id,
-                            product_name: item.product.name,
-                            required_per_package: item.qty,
-                            total_required: requiredQty,
-                            available_stock: item.product.stock,
-                            is_sufficient: available
-                        });
-
-                        if (!available) {
-                            isAvailable = false;
-                        }
+    const pkg = await Package.findOne({
+        where: { id, deleted_at: null, is_active: true },
+        include: [
+            {
+                model: PackageItem,
+                as: 'items',
+                include: [
+                    {
+                        model: Product,
+                        as: 'product',
+                        attributes: ['id', 'name', 'stock', 'deletedAt'],
+                        paranoid: false
                     }
-                } else {
-                    // Product association is null, meaning product was deleted
+                ]
+            }
+        ]
+    });
+
+    if (!pkg) {
+        return res.status(404).json({
+            success: false,
+            message: 'Package not found or inactive'
+        });
+    }
+
+    let isAvailable = true;
+    const stockDetails = [];
+
+    for (const item of pkg.items) {
+        if (item.product_id) {
+            // This is a product item, check availability
+            if (item.product) {
+                // Additional check: verify if product is actually deleted
+                const productCheck = await Product.findByPk(item.product.id, { paranoid: false });
+                const isDeleted = productCheck && productCheck.deletedAt !== null;
+
+                if (isDeleted) {
+                    // Product has been soft deleted
                     stockDetails.push({
-                        product_id: item.product_id,
-                        product_name: 'Unknown Product',
+                        product_id: item.product.id,
+                        product_name: item.product.name,
                         status: 'DELETED',
                         message: 'Product has been removed from inventory'
                     });
                     isAvailable = false;
-                }
-            }
-            // Skip service items (service_id is not null) - services don't have stock constraints
-        }
+                } else {
+                    // Product is active, check stock
+                    const requiredQty = item.qty * requestedQty;
+                    const available = item.product.stock >= requiredQty;
 
-        res.status(200).json({
-            success: true,
-            data: {
-                package_id: pkg.id,
-                package_name: pkg.name,
-                requested_qty: requestedQty,
-                is_available: isAvailable,
-                stock_details: stockDetails
+                    stockDetails.push({
+                        product_id: item.product.id,
+                        product_name: item.product.name,
+                        required_per_package: item.qty,
+                        total_required: requiredQty,
+                        available_stock: item.product.stock,
+                        is_sufficient: available
+                    });
+
+                    if (!available) {
+                        isAvailable = false;
+                    }
+                }
+            } else {
+                // Product association is null, meaning product was deleted
+                stockDetails.push({
+                    product_id: item.product_id,
+                    product_name: 'Unknown Product',
+                    status: 'DELETED',
+                    message: 'Product has been removed from inventory'
+                });
+                isAvailable = false;
             }
-        });
-    } catch (error) {
-        console.error('Check availability error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error checking package availability', 
-            error: error.message 
-        });
+        }
+        // Skip service items (service_id is not null) - services don't have stock constraints
     }
-};
+
+    res.status(200).json({
+        success: true,
+        data: {
+            package_id: pkg.id,
+            package_name: pkg.name,
+            requested_qty: requestedQty,
+            is_available: isAvailable,
+            stock_details: stockDetails
+        }
+    });
+});
 
 /**
  * Upload package image
  * POST /api/packages/:id/upload-image
  */
-exports.uploadPackageImage = async (req, res) => {
+exports.uploadPackageImage = asyncHandler(async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -825,15 +784,10 @@ exports.uploadPackageImage = async (req, res) => {
             }
         });
     } catch (error) {
-        // Delete uploaded file on error
+        // Clean up the orphaned upload before delegating to the global handler.
         if (req.file && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }
-        console.error('Upload package image error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error uploading package image',
-            error: error.message
-        });
+        throw error;
     }
-};;
+});

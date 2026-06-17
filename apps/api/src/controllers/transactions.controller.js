@@ -16,68 +16,21 @@ const Mechanic = require('../models/mechanic.model');
 const User = require('../models/user.model');
 const InventoryLog = require('../models/inventory-log.model');
 const auditService = require('../services/audit.service');
+const asyncHandler = require('../utils/async-handler');
+const {
+    TRANSACTION_STATUS,
+    EDITABLE_STATUSES,
+    ITEM_TYPE,
+    INVENTORY_TYPE,
+    INVENTORY_REFERENCE,
+    PAYMENT_METHOD,
+    SERVICE_INTERVAL_MONTHS,
+    SERVICE_INTERVAL_KM,
+    MAX_ITEMS_PER_TRANSACTION,
+} = require('../utils/constants');
 
-// ============================================
-// ERROR HANDLING HELPERS
-// ============================================
-
-/**
- * Get detailed error message based on error type
- */
-const getDetailedErrorMessage = (error) => {
-    // Handle Sequelize validation errors
-    if (error.name === 'SequelizeValidationError') {
-        const messages = error.errors.map(err => `${err.path}: ${err.message}`);
-        return `Validation Error: ${messages.join(', ')}`;
-    }
-
-    // Handle Sequelize unique constraint errors
-    if (error.name === 'SequelizeUniqueConstraintError') {
-        return `Duplicate entry error: ${error.errors[0]?.message || 'Unique constraint violated'}`;
-    }
-
-    // Handle Sequelize foreign key constraint errors
-    if (error.name === 'SequelizeForeignKeyConstraintError') {
-        return `Foreign key constraint error: Invalid reference in ${error.table}`;
-    }
-
-    // Handle custom business logic errors
-    if (error.message.includes('Insufficient stock')) {
-        return error.message; // Already descriptive
-    }
-
-    if (error.message.includes('not found')) {
-        return error.message; // Already descriptive
-    }
-
-    // Handle database connection errors
-    if (error.name === 'SequelizeConnectionError') {
-        return 'Database connection error. Please try again later.';
-    }
-
-    // Handle transaction rollback errors
-    if (error.message.includes('rollback')) {
-        return 'Transaction failed and was rolled back. Please check your data and try again.';
-    }
-
-    // Generic fallback
-    return error.message || 'An unexpected error occurred while processing the transaction';
-};
-
-/**
- * Log error with context for debugging
- */
-const logTransactionError = (error, context) => {
-    console.error('=== TRANSACTION ERROR ===');
-    console.error('Timestamp:', new Date().toISOString());
-    console.error('Error Type:', error.name || 'Unknown');
-    console.error('Error Message:', error.message);
-    console.error('Context:', context);
-    if (error.stack) {
-        console.error('Stack Trace:', error.stack);
-    }
-    console.error('=== END ERROR ===');
-};
+// Sequelize error mapping + structured 5xx logging now live in the centralized
+// error middleware; controllers just roll back their transaction and rethrow.
 
 // ============================================
 // HELPER FUNCTIONS
@@ -85,8 +38,8 @@ const logTransactionError = (error, context) => {
 
 /**
  * Calculate next service date and KM for vehicle
- * Called when transaction status becomes 'PAID'
- * 
+ * Called when transaction status becomes TRANSACTION_STATUS.PAID
+ *
  * Formula (from spec.md Section 3.G):
  * - Time Based: NextDate = Transaction Date + 3 Months
  * - Usage Based: NextKM = current_km + 2,000 KM
@@ -97,13 +50,13 @@ const calculateNextServiceReminder = async (vehicleId, currentKm, transactionDat
     const vehicle = await Vehicle.findByPk(vehicleId, { transaction: t });
     if (!vehicle) return null;
 
-    // Calculate next service date (3 months from transaction)
+    // Calculate next service date (default: 3 months from transaction)
     const nextServiceDate = new Date(transactionDate);
-    nextServiceDate.setMonth(nextServiceDate.getMonth() + 3);
+    nextServiceDate.setMonth(nextServiceDate.getMonth() + SERVICE_INTERVAL_MONTHS);
 
-    // Calculate next service KM (+2000 KM from current)
+    // Calculate next service KM (default: +2,000 KM from current)
     const kmAtTransaction = currentKm || vehicle.current_km || 0;
-    const nextServiceKm = kmAtTransaction + 2000;
+    const nextServiceKm = kmAtTransaction + SERVICE_INTERVAL_KM;
 
     // Update vehicle with new service reminder
     await vehicle.update({
@@ -127,8 +80,8 @@ const restoreInventory = async (transactionId, userId, t) => {
     const logs = await InventoryLog.findAll({
         where: {
             reference_id: `TRX-${transactionId}`,
-            reference_type: 'TRANSACTION',
-            type: 'OUT'
+            reference_type: INVENTORY_REFERENCE.TRANSACTION,
+            type: INVENTORY_TYPE.OUT
         },
         transaction: t
     });
@@ -149,11 +102,11 @@ const restoreInventory = async (transactionId, userId, t) => {
             await InventoryLog.create({
                 product_id: log.product_id,
                 user_id: userId,
-                type: 'IN',
+                type: INVENTORY_TYPE.IN,
                 qty: log.qty,
                 stock_before: stockBefore,
                 stock_after: stockAfter,
-                reference_type: 'RETURN',
+                reference_type: INVENTORY_REFERENCE.RETURN,
                 reference_id: `TRX-${transactionId}`,
                 notes: `Stock returned - Transaction #${transactionId} cancelled`
             }, { transaction: t });
@@ -169,7 +122,7 @@ const restoreInventory = async (transactionId, userId, t) => {
  * Create new transaction (ATOMIC)
  * POST /api/transactions
  */
-exports.createTransaction = async (req, res) => {
+exports.createTransaction = asyncHandler(async (req, res) => {
     const t = await sequelize.transaction();
 
     try {
@@ -236,11 +189,11 @@ exports.createTransaction = async (req, res) => {
         const packageIds = new Set();
 
         for (const item of items) {
-            if (item.item_type === 'PRODUCT' && item.item_id) {
+            if (item.item_type === ITEM_TYPE.PRODUCT && item.item_id) {
                 productIds.add(item.item_id);
-            } else if (item.item_type === 'SERVICE' && item.item_id) {
+            } else if (item.item_type === ITEM_TYPE.SERVICE && item.item_id) {
                 serviceIds.add(item.item_id);
-            } else if (item.item_type === 'PACKAGE' && item.item_id) {
+            } else if (item.item_type === ITEM_TYPE.PACKAGE && item.item_id) {
                 packageIds.add(item.item_id);
             }
         }
@@ -319,7 +272,7 @@ exports.createTransaction = async (req, res) => {
                 });
             }
 
-            if (item.item_type !== 'EXTERNAL' && !item.item_id) {
+            if (item.item_type !== ITEM_TYPE.EXTERNAL && !item.item_id) {
                 await t.rollback();
                 return res.status(400).json({
                     success: false,
@@ -334,7 +287,7 @@ exports.createTransaction = async (req, res) => {
             let itemName = '';
 
             // Price determination logic using cached data
-            if (item.item_type === 'PRODUCT') {
+            if (item.item_type === ITEM_TYPE.PRODUCT) {
                 const product = productMap[item.item_id];
                 if (!product) {
                     await t.rollback();
@@ -360,7 +313,7 @@ exports.createTransaction = async (req, res) => {
                     qty: qty,
                     current_stock: product.stock
                 });
-            } else if (item.item_type === 'SERVICE') {
+            } else if (item.item_type === ITEM_TYPE.SERVICE) {
                 const service = serviceMap[item.item_id];
                 if (!service) {
                     await t.rollback();
@@ -373,7 +326,7 @@ exports.createTransaction = async (req, res) => {
                 sellPrice = basePrice - parseFloat(item.discount_amount || 0);
                 costPrice = 0; // Services have no COGS
                 itemName = service.name;
-            } else if (item.item_type === 'PACKAGE') {
+            } else if (item.item_type === ITEM_TYPE.PACKAGE) {
                 const pkg = packageMap[item.item_id];
                 if (!pkg) {
                     await t.rollback();
@@ -409,7 +362,7 @@ exports.createTransaction = async (req, res) => {
                     }
                 }
                 costPrice = totalComponentCost * qty;
-            } else if (item.item_type === 'EXTERNAL') {
+            } else if (item.item_type === ITEM_TYPE.EXTERNAL) {
                 basePrice = parseFloat(item.base_price || 0);
                 sellPrice = basePrice - parseFloat(item.discount_amount || 0);
                 costPrice = parseFloat(item.cost_price || 0);
@@ -442,16 +395,16 @@ exports.createTransaction = async (req, res) => {
         // Determine initial status.
         // Base status is PENDING for an open "bon sementara", otherwise UNPAID.
         // A payment still upgrades it to PARTIAL/PAID (bill remains editable while PARTIAL).
-        let initialStatus = isPending ? 'PENDING' : 'UNPAID';
+        let initialStatus = isPending ? TRANSACTION_STATUS.PENDING : TRANSACTION_STATUS.UNPAID;
         let paidAmount = 0;
         if (initial_payment && initial_payment.amount > 0) {
             // Cap recorded payment at the bill total. Cash overpayment is "change given",
             // not revenue — storing the full tendered amount would inflate financial reports.
             paidAmount = Math.min(parseFloat(initial_payment.amount), totalAmount);
             if (paidAmount >= totalAmount) {
-                initialStatus = 'PAID';
+                initialStatus = TRANSACTION_STATUS.PAID;
             } else if (paidAmount > 0) {
-                initialStatus = 'PARTIAL';
+                initialStatus = TRANSACTION_STATUS.PARTIAL;
             }
         }
 
@@ -512,11 +465,11 @@ exports.createTransaction = async (req, res) => {
                     await InventoryLog.create({
                         product_id: component.product_id,
                         user_id: userId,
-                        type: 'OUT',
+                        type: INVENTORY_TYPE.OUT,
                         qty: component.qty,
                         stock_before: stockBefore,
                         stock_after: stockAfter,
-                        reference_type: 'TRANSACTION',
+                        reference_type: INVENTORY_REFERENCE.TRANSACTION,
                         reference_id: `TRX-${transaction.id}`,
                         notes: component.is_package_component ? `Out via Package "${component.package_name}" - Transaction #${transaction.id}` : `Sale - Transaction #${transaction.id}`
                     }, { transaction: t });
@@ -530,7 +483,7 @@ exports.createTransaction = async (req, res) => {
                 transaction_id: transaction.id,
                 user_id: userId,
                 amount: paidAmount,
-                payment_method: initial_payment.payment_method || 'CASH',
+                payment_method: initial_payment.payment_method || PAYMENT_METHOD.CASH,
                 reference_number: initial_payment.reference_number || null,
                 date: new Date()
             }, { transaction: t });
@@ -538,7 +491,7 @@ exports.createTransaction = async (req, res) => {
 
         // If PAID, calculate service reminder
         let serviceReminder = null;
-        if (initialStatus === 'PAID' && vehicle_id) {
+        if (initialStatus === TRANSACTION_STATUS.PAID && vehicle_id) {
             serviceReminder = await calculateNextServiceReminder(vehicle_id, current_km, new Date(), t);
         }
 
@@ -584,34 +537,14 @@ exports.createTransaction = async (req, res) => {
         });
 
     } catch (error) {
-        // Ensure transaction is rolled back
+        // Roll back the open transaction, then delegate response shaping to the
+        // centralized error handler (Sequelize mapping + 5xx logging live there).
         if (t && !t.finished) {
-            try {
-                await t.rollback();
-            } catch (rollbackError) {
-                console.error('Error rolling back transaction:', rollbackError);
-            }
+            try { await t.rollback(); } catch (rb) { console.error('Rollback error (createTransaction):', rb); }
         }
-
-        // Log detailed error for debugging
-        logTransactionError(error, {
-            userId: req.user?.id,
-            payload: req.body,
-            transactionStep: 'create_transaction',
-            itemCount: req.body?.items?.length || 0
-        });
-
-        // Return user-friendly error message
-        const errorMessage = getDetailedErrorMessage(error);
-
-        res.status(500).json({
-            success: false,
-            message: 'Failed to create transaction',
-            error: errorMessage,
-            code: error.name || 'TRANSACTION_ERROR'
-        });
+        throw error;
     }
-};
+});
 
 /**
  * Update items of an open transaction ("bon sementara / rawat inap").
@@ -628,7 +561,7 @@ exports.createTransaction = async (req, res) => {
  *
  * PUT /api/transactions/:id
  */
-exports.updateTransaction = async (req, res) => {
+exports.updateTransaction = asyncHandler(async (req, res) => {
     const t = await sequelize.transaction();
 
     try {
@@ -641,9 +574,9 @@ exports.updateTransaction = async (req, res) => {
             await t.rollback();
             return res.status(400).json({ success: false, message: 'Transaksi harus memiliki minimal satu item' });
         }
-        if (items.length > 50) {
+        if (items.length > MAX_ITEMS_PER_TRANSACTION) {
             await t.rollback();
-            return res.status(400).json({ success: false, message: 'Maksimal 50 item per transaksi' });
+            return res.status(400).json({ success: false, message: `Maksimal ${MAX_ITEMS_PER_TRANSACTION} item per transaksi` });
         }
 
         // ---- Load + lock transaction header (race-safe vs addPayment) ----
@@ -653,8 +586,7 @@ exports.updateTransaction = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Transaksi tidak ditemukan' });
         }
 
-        const EDITABLE = ['PENDING', 'UNPAID', 'PARTIAL'];
-        if (!EDITABLE.includes(transaction.status)) {
+        if (!EDITABLE_STATUSES.includes(transaction.status)) {
             await t.rollback();
             return res.status(400).json({
                 success: false,
@@ -716,7 +648,7 @@ exports.updateTransaction = async (req, res) => {
             k.existing = existing;
 
             // PACKAGE is immutable: qty must stay the same
-            if (existing.item_type === 'PACKAGE' && qty !== existing.qty) {
+            if (existing.item_type === ITEM_TYPE.PACKAGE && qty !== existing.qty) {
                 await t.rollback();
                 return res.status(400).json({ success: false, message: `Qty paket "${existing.item_name}" tidak dapat diubah lewat edit. Batalkan transaksi bila perlu mengubah paket.` });
             }
@@ -724,7 +656,7 @@ exports.updateTransaction = async (req, res) => {
 
         // ---- PACKAGE immutability: every existing package must be kept ----
         for (const it of existingItems) {
-            if (it.item_type === 'PACKAGE' && !keptIds.has(it.id)) {
+            if (it.item_type === ITEM_TYPE.PACKAGE && !keptIds.has(it.id)) {
                 await t.rollback();
                 return res.status(400).json({ success: false, message: `Paket "${it.item_name}" tidak dapat dihapus lewat edit. Batalkan transaksi bila perlu.` });
             }
@@ -740,11 +672,11 @@ exports.updateTransaction = async (req, res) => {
                 await t.rollback();
                 return res.status(400).json({ success: false, message: `Item ke-${pos}: item_type wajib diisi` });
             }
-            if (raw.item_type === 'PACKAGE') {
+            if (raw.item_type === ITEM_TYPE.PACKAGE) {
                 await t.rollback();
                 return res.status(400).json({ success: false, message: 'Menambah paket lewat edit belum didukung. Tambahkan produk/jasa satuan.' });
             }
-            if (!['PRODUCT', 'SERVICE', 'EXTERNAL'].includes(raw.item_type)) {
+            if (![ITEM_TYPE.PRODUCT, ITEM_TYPE.SERVICE, ITEM_TYPE.EXTERNAL].includes(raw.item_type)) {
                 await t.rollback();
                 return res.status(400).json({ success: false, message: `Item ke-${pos}: item_type tidak valid (${raw.item_type})` });
             }
@@ -767,19 +699,19 @@ exports.updateTransaction = async (req, res) => {
         const newProductIds = new Set();
         const newServiceIds = new Set();
         for (const p of processedNew) {
-            if (p.raw.item_type === 'PRODUCT') {
+            if (p.raw.item_type === ITEM_TYPE.PRODUCT) {
                 if (!p.raw.item_id) {
                     await t.rollback();
                     return res.status(400).json({ success: false, message: `Item ke-${p.pos}: item_id wajib untuk PRODUCT` });
                 }
                 newProductIds.add(p.raw.item_id);
-            } else if (p.raw.item_type === 'SERVICE') {
+            } else if (p.raw.item_type === ITEM_TYPE.SERVICE) {
                 if (!p.raw.item_id) {
                     await t.rollback();
                     return res.status(400).json({ success: false, message: `Item ke-${p.pos}: item_id wajib untuk SERVICE` });
                 }
                 newServiceIds.add(p.raw.item_id);
-            } else if (p.raw.item_type === 'EXTERNAL') {
+            } else if (p.raw.item_type === ITEM_TYPE.EXTERNAL) {
                 if (!p.raw.item_name || String(p.raw.item_name).trim() === '') {
                     await t.rollback();
                     return res.status(400).json({ success: false, message: `Item ke-${p.pos}: item_name wajib untuk EXTERNAL` });
@@ -789,7 +721,7 @@ exports.updateTransaction = async (req, res) => {
 
         // Existing standalone PRODUCT item ids (kept or removed) also need their stock rows
         const existingProductIds = new Set(
-            existingItems.filter(it => it.item_type === 'PRODUCT' && it.item_id).map(it => it.item_id)
+            existingItems.filter(it => it.item_type === ITEM_TYPE.PRODUCT && it.item_id).map(it => it.item_id)
         );
         const allProductIds = new Set([...existingProductIds, ...newProductIds]);
 
@@ -818,7 +750,7 @@ exports.updateTransaction = async (req, res) => {
             const { raw, qty, discount } = p;
             let basePrice = 0, sellPrice = 0, costPrice = 0, itemName = '';
 
-            if (raw.item_type === 'PRODUCT') {
+            if (raw.item_type === ITEM_TYPE.PRODUCT) {
                 const product = productMap[raw.item_id];
                 if (!product) {
                     await t.rollback();
@@ -828,7 +760,7 @@ exports.updateTransaction = async (req, res) => {
                 sellPrice = basePrice - discount;
                 costPrice = parseFloat(product.price_buy);
                 itemName = product.name;
-            } else if (raw.item_type === 'SERVICE') {
+            } else if (raw.item_type === ITEM_TYPE.SERVICE) {
                 const service = serviceMap[raw.item_id];
                 if (!service) {
                     await t.rollback();
@@ -885,18 +817,18 @@ exports.updateTransaction = async (req, res) => {
         // ---- Compute product stock delta (PRODUCT items only) ----
         const oldQtyByProduct = new Map();
         for (const it of existingItems) {
-            if (it.item_type === 'PRODUCT' && it.item_id) {
+            if (it.item_type === ITEM_TYPE.PRODUCT && it.item_id) {
                 oldQtyByProduct.set(it.item_id, (oldQtyByProduct.get(it.item_id) || 0) + it.qty);
             }
         }
         const newQtyByProduct = new Map();
         for (const k of keptInputs) {
-            if (k.existing.item_type === 'PRODUCT' && k.existing.item_id) {
+            if (k.existing.item_type === ITEM_TYPE.PRODUCT && k.existing.item_id) {
                 newQtyByProduct.set(k.existing.item_id, (newQtyByProduct.get(k.existing.item_id) || 0) + k.qtyParsed);
             }
         }
         for (const p of processedNew) {
-            if (p.raw.item_type === 'PRODUCT') {
+            if (p.raw.item_type === ITEM_TYPE.PRODUCT) {
                 newQtyByProduct.set(p.raw.item_id, (newQtyByProduct.get(p.raw.item_id) || 0) + p.qty);
             }
         }
@@ -932,11 +864,11 @@ exports.updateTransaction = async (req, res) => {
             await InventoryLog.create({
                 product_id: product.id,
                 user_id: userId,
-                type: net > 0 ? 'OUT' : 'IN',
+                type: net > 0 ? INVENTORY_TYPE.OUT : INVENTORY_TYPE.IN,
                 qty: Math.abs(net),
                 stock_before: stockBefore,
                 stock_after: stockAfter,
-                reference_type: net > 0 ? 'TRANSACTION' : 'RETURN',
+                reference_type: net > 0 ? INVENTORY_REFERENCE.TRANSACTION : INVENTORY_REFERENCE.RETURN,
                 reference_id: `TRX-${transaction.id}`,
                 notes: net > 0
                     ? `Edit transaksi #${transaction.id} - tambah qty`
@@ -966,11 +898,11 @@ exports.updateTransaction = async (req, res) => {
         // 5) Recompute status against existing payments (edit never adds a payment)
         let newStatus;
         if (totalPaid <= 0) {
-            newStatus = beforeStatus === 'PENDING' ? 'PENDING' : 'UNPAID';
+            newStatus = beforeStatus === TRANSACTION_STATUS.PENDING ? TRANSACTION_STATUS.PENDING : TRANSACTION_STATUS.UNPAID;
         } else if (totalPaid >= totalAmount) {
-            newStatus = 'PAID';
+            newStatus = TRANSACTION_STATUS.PAID;
         } else {
-            newStatus = 'PARTIAL';
+            newStatus = TRANSACTION_STATUS.PARTIAL;
         }
 
         // 6) Update header (only set optional fields when provided)
@@ -1041,202 +973,176 @@ exports.updateTransaction = async (req, res) => {
         if (t && !t.finished) {
             try { await t.rollback(); } catch (rb) { console.error('Rollback error (updateTransaction):', rb); }
         }
-        console.error('Update transaction error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Gagal memperbarui transaksi',
-            error: error.message,
-            code: error.name || 'TRANSACTION_UPDATE_ERROR'
-        });
+        throw error;
     }
-};
+});
 
 /**
  * Get transaction by ID with full details
  * GET /api/transactions/:id
  */
-exports.getTransactionById = async (req, res) => {
-    try {
-        const { id } = req.params;
+exports.getTransactionById = asyncHandler(async (req, res) => {
+    const { id } = req.params;
 
-        const transaction = await Transaction.findByPk(id, {
-            include: [
-                { model: TransactionItem, as: 'items' },
-                { model: Payment, as: 'payments' },
-                { 
-                    model: Vehicle, 
-                    as: 'vehicle',
-                    include: [{ 
-                        model: Customer, 
-                        as: 'customer',
-                        attributes: ['id', 'name', 'phone', 'address']
-                    }]
-                },
-                { model: Mechanic, as: 'mechanic', attributes: ['id', 'name'] },
-                { model: User, as: 'user', attributes: ['id', 'username', 'full_name'] }
-            ]
-        });
+    const transaction = await Transaction.findByPk(id, {
+        include: [
+            { model: TransactionItem, as: 'items' },
+            { model: Payment, as: 'payments' },
+            {
+                model: Vehicle,
+                as: 'vehicle',
+                include: [{
+                    model: Customer,
+                    as: 'customer',
+                    attributes: ['id', 'name', 'phone', 'address']
+                }]
+            },
+            { model: Mechanic, as: 'mechanic', attributes: ['id', 'name'] },
+            { model: User, as: 'user', attributes: ['id', 'username', 'full_name'] }
+        ]
+    });
 
-        if (!transaction) {
-            return res.status(404).json({
-                success: false,
-                message: 'Transaction not found'
-            });
-        }
-
-        // Calculate payment summary
-        const totalPaid = transaction.payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
-        const remaining = Math.max(0, parseFloat(transaction.total_amount) - totalPaid);
-
-        // Calculate profit
-        const totalCost = transaction.items.reduce((sum, item) => {
-            return sum + (parseFloat(item.cost_price || 0) * item.qty);
-        }, 0);
-        const profit = parseFloat(transaction.total_amount) - totalCost;
-
-        res.status(200).json({
-            success: true,
-            data: {
-                transaction,
-                payment_summary: {
-                    total_amount: parseFloat(transaction.total_amount),
-                    total_paid: totalPaid,
-                    remaining: remaining,
-                    is_fully_paid: remaining <= 0
-                },
-                profit_info: {
-                    revenue: parseFloat(transaction.total_amount),
-                    cost: totalCost,
-                    profit: profit,
-                    margin_percent: parseFloat(transaction.total_amount) > 0 
-                        ? ((profit / parseFloat(transaction.total_amount)) * 100).toFixed(2)
-                        : 0
-                }
-            }
-        });
-
-    } catch (error) {
-        console.error('Get transaction error:', error);
-        res.status(500).json({
+    if (!transaction) {
+        return res.status(404).json({
             success: false,
-            message: 'Error retrieving transaction',
-            error: error.message
+            message: 'Transaction not found'
         });
     }
-};
+
+    // Calculate payment summary
+    const totalPaid = transaction.payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+    const remaining = Math.max(0, parseFloat(transaction.total_amount) - totalPaid);
+
+    // Calculate profit
+    const totalCost = transaction.items.reduce((sum, item) => {
+        return sum + (parseFloat(item.cost_price || 0) * item.qty);
+    }, 0);
+    const profit = parseFloat(transaction.total_amount) - totalCost;
+
+    res.status(200).json({
+        success: true,
+        data: {
+            transaction,
+            payment_summary: {
+                total_amount: parseFloat(transaction.total_amount),
+                total_paid: totalPaid,
+                remaining: remaining,
+                is_fully_paid: remaining <= 0
+            },
+            profit_info: {
+                revenue: parseFloat(transaction.total_amount),
+                cost: totalCost,
+                profit: profit,
+                margin_percent: parseFloat(transaction.total_amount) > 0
+                    ? ((profit / parseFloat(transaction.total_amount)) * 100).toFixed(2)
+                    : 0
+            }
+        }
+    });
+});
 
 /**
  * Get all transactions with filters
  * GET /api/transactions?status=PAID&date_from=2024-01-01&date_to=2024-12-31
  */
-exports.getAllTransactions = async (req, res) => {
-    try {
-        const {
-            status,
-            vehicle_id,
-            mechanic_id,
-            date_from,
-            date_to,
-            page = 1,
-            limit = 20,
-            sort_by = 'date',
-            sort_order = 'DESC'
-        } = req.query;
+exports.getAllTransactions = asyncHandler(async (req, res) => {
+    const {
+        status,
+        vehicle_id,
+        mechanic_id,
+        date_from,
+        date_to,
+        page = 1,
+        limit = 20,
+        sort_by = 'date',
+        sort_order = 'DESC'
+    } = req.query;
 
-        // Build where clause
-        const where = {};
+    // Build where clause
+    const where = {};
 
-        if (status) {
-            where.status = status;
-        }
-
-        if (vehicle_id) {
-            where.vehicle_id = vehicle_id;
-        }
-
-        if (mechanic_id) {
-            where.mechanic_id = mechanic_id;
-        }
-
-        if (date_from || date_to) {
-            where.date = {};
-            if (date_from) {
-                where.date[Op.gte] = new Date(date_from);
-            }
-            if (date_to) {
-                const endDate = new Date(date_to);
-                endDate.setHours(23, 59, 59, 999);
-                where.date[Op.lte] = endDate;
-            }
-        }
-
-        const offset = (parseInt(page) - 1) * parseInt(limit);
-
-        // Whitelist sortable columns; an unknown sort_by would otherwise make Sequelize throw.
-        const ALLOWED_SORT = ['date', 'total_amount', 'status', 'id', 'created_at'];
-        const sortBy = ALLOWED_SORT.includes(sort_by) ? sort_by : 'date';
-        const sortOrder = String(sort_order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-
-        const { count, rows: transactions } = await Transaction.findAndCountAll({
-            where,
-            include: [
-                { 
-                    model: Vehicle, 
-                    as: 'vehicle',
-                    attributes: ['id', 'license_plate', 'brand', 'model'],
-                    include: [{
-                        model: Customer,
-                        as: 'customer',
-                        attributes: ['id', 'name', 'phone']
-                    }]
-                },
-                { model: Mechanic, as: 'mechanic', attributes: ['id', 'name'] },
-                { model: Payment, as: 'payments', attributes: ['id', 'amount', 'payment_method', 'date'] }
-            ],
-            order: [[sortBy, sortOrder]],
-            limit: parseInt(limit),
-            offset
-        });
-
-        // Add payment summary to each transaction
-        const transactionsWithSummary = transactions.map(trx => {
-            const data = trx.toJSON();
-            const totalPaid = data.payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
-            data.payment_summary = {
-                total_paid: totalPaid,
-                remaining: Math.max(0, parseFloat(data.total_amount) - totalPaid)
-            };
-            return data;
-        });
-
-        res.status(200).json({
-            success: true,
-            data: {
-                transactions: transactionsWithSummary,
-                pagination: {
-                    total: count,
-                    page: parseInt(page),
-                    limit: parseInt(limit),
-                    total_pages: Math.ceil(count / parseInt(limit))
-                }
-            }
-        });
-
-    } catch (error) {
-        console.error('Get transactions error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error retrieving transactions',
-            error: error.message
-        });
+    if (status) {
+        where.status = status;
     }
-};
+
+    if (vehicle_id) {
+        where.vehicle_id = vehicle_id;
+    }
+
+    if (mechanic_id) {
+        where.mechanic_id = mechanic_id;
+    }
+
+    if (date_from || date_to) {
+        where.date = {};
+        if (date_from) {
+            where.date[Op.gte] = new Date(date_from);
+        }
+        if (date_to) {
+            const endDate = new Date(date_to);
+            endDate.setHours(23, 59, 59, 999);
+            where.date[Op.lte] = endDate;
+        }
+    }
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    // Whitelist sortable columns; an unknown sort_by would otherwise make Sequelize throw.
+    const ALLOWED_SORT = ['date', 'total_amount', 'status', 'id', 'created_at'];
+    const sortBy = ALLOWED_SORT.includes(sort_by) ? sort_by : 'date';
+    const sortOrder = String(sort_order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    const { count, rows: transactions } = await Transaction.findAndCountAll({
+        where,
+        include: [
+            {
+                model: Vehicle,
+                as: 'vehicle',
+                attributes: ['id', 'license_plate', 'brand', 'model'],
+                include: [{
+                    model: Customer,
+                    as: 'customer',
+                    attributes: ['id', 'name', 'phone']
+                }]
+            },
+            { model: Mechanic, as: 'mechanic', attributes: ['id', 'name'] },
+            { model: Payment, as: 'payments', attributes: ['id', 'amount', 'payment_method', 'date'] }
+        ],
+        order: [[sortBy, sortOrder]],
+        limit: parseInt(limit),
+        offset
+    });
+
+    // Add payment summary to each transaction
+    const transactionsWithSummary = transactions.map(trx => {
+        const data = trx.toJSON();
+        const totalPaid = data.payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+        data.payment_summary = {
+            total_paid: totalPaid,
+            remaining: Math.max(0, parseFloat(data.total_amount) - totalPaid)
+        };
+        return data;
+    });
+
+    res.status(200).json({
+        success: true,
+        data: {
+            transactions: transactionsWithSummary,
+            pagination: {
+                total: count,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total_pages: Math.ceil(count / parseInt(limit))
+            }
+        }
+    });
+});
 
 /**
  * Add payment to transaction
  * POST /api/transactions/:id/pay
  */
-exports.addPayment = async (req, res) => {
+exports.addPayment = asyncHandler(async (req, res) => {
     const t = await sequelize.transaction();
 
     try {
@@ -1277,7 +1183,7 @@ exports.addPayment = async (req, res) => {
         }
 
         // Check if transaction can accept payment
-        if (transaction.status === 'CANCELLED') {
+        if (transaction.status === TRANSACTION_STATUS.CANCELLED) {
             await t.rollback();
             return res.status(400).json({
                 success: false,
@@ -1285,7 +1191,7 @@ exports.addPayment = async (req, res) => {
             });
         }
 
-        if (transaction.status === 'PAID') {
+        if (transaction.status === TRANSACTION_STATUS.PAID) {
             await t.rollback();
             return res.status(400).json({
                 success: false,
@@ -1328,10 +1234,10 @@ exports.addPayment = async (req, res) => {
         let statusChanged = false;
 
         if (newRemaining <= 0) {
-            newStatus = 'PAID';
-            statusChanged = transaction.status !== 'PAID';
+            newStatus = TRANSACTION_STATUS.PAID;
+            statusChanged = transaction.status !== TRANSACTION_STATUS.PAID;
         } else if (newTotalPaid > 0) {
-            newStatus = 'PARTIAL';
+            newStatus = TRANSACTION_STATUS.PARTIAL;
         }
 
         // Update transaction status if changed
@@ -1341,7 +1247,7 @@ exports.addPayment = async (req, res) => {
 
         // If status changed to PAID, calculate service reminder
         let serviceReminder = null;
-        if (statusChanged && newStatus === 'PAID' && transaction.vehicle_id) {
+        if (statusChanged && newStatus === TRANSACTION_STATUS.PAID && transaction.vehicle_id) {
             serviceReminder = await calculateNextServiceReminder(
                 transaction.vehicle_id,
                 transaction.current_km,
@@ -1363,8 +1269,8 @@ exports.addPayment = async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: newStatus === 'PAID' 
-                ? 'Payment successful. Transaction is now fully paid.' 
+            message: newStatus === TRANSACTION_STATUS.PAID
+                ? 'Payment successful. Transaction is now fully paid.'
                 : 'Payment added successfully',
             data: {
                 payment,
@@ -1380,21 +1286,18 @@ exports.addPayment = async (req, res) => {
         });
 
     } catch (error) {
-        await t.rollback();
-        console.error('Add payment error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error adding payment',
-            error: error.message
-        });
+        if (t && !t.finished) {
+            try { await t.rollback(); } catch (rb) { console.error('Rollback error (addPayment):', rb); }
+        }
+        throw error;
     }
-};
+});
 
 /**
  * Cancel transaction
  * PUT /api/transactions/:id/cancel
  */
-exports.cancelTransaction = async (req, res) => {
+exports.cancelTransaction = asyncHandler(async (req, res) => {
     const t = await sequelize.transaction();
 
     try {
@@ -1416,7 +1319,7 @@ exports.cancelTransaction = async (req, res) => {
             });
         }
 
-        if (transaction.status === 'CANCELLED') {
+        if (transaction.status === TRANSACTION_STATUS.CANCELLED) {
             await t.rollback();
             return res.status(400).json({
                 success: false,
@@ -1426,14 +1329,14 @@ exports.cancelTransaction = async (req, res) => {
 
         // Check if transaction has payments
         const totalPaid = transaction.payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
-        
+
         if (totalPaid > 0) {
             // Create refund payment (negative amount)
             await Payment.create({
                 transaction_id: transaction.id,
                 user_id: userId,
                 amount: -totalPaid,
-                payment_method: 'REFUND',
+                payment_method: PAYMENT_METHOD.REFUND,
                 reference_number: `REFUND-TRX-${transaction.id}`,
                 date: new Date()
             }, { transaction: t });
@@ -1445,11 +1348,11 @@ exports.cancelTransaction = async (req, res) => {
         // Roll back the vehicle service reminder if THIS paid transaction set one.
         // Recompute from the vehicle's latest remaining PAID transaction (reusing the
         // same reminder logic), or clear it when no prior paid service exists.
-        if (transaction.status === 'PAID' && transaction.vehicle_id) {
+        if (transaction.status === TRANSACTION_STATUS.PAID && transaction.vehicle_id) {
             const lastPaid = await Transaction.findOne({
                 where: {
                     vehicle_id: transaction.vehicle_id,
-                    status: 'PAID',
+                    status: TRANSACTION_STATUS.PAID,
                     id: { [Op.ne]: transaction.id }
                 },
                 order: [['date', 'DESC']],
@@ -1467,8 +1370,8 @@ exports.cancelTransaction = async (req, res) => {
 
         // Update transaction status
         await transaction.update({
-            status: 'CANCELLED',
-            notes: transaction.notes 
+            status: TRANSACTION_STATUS.CANCELLED,
+            notes: transaction.notes
                 ? `${transaction.notes}\n\n[CANCELLED] ${reason || 'No reason provided'}`
                 : `[CANCELLED] ${reason || 'No reason provided'}`
         }, { transaction: t });
@@ -1492,150 +1395,152 @@ exports.cancelTransaction = async (req, res) => {
         });
 
     } catch (error) {
-        await t.rollback();
-        console.error('Cancel transaction error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error cancelling transaction',
-            error: error.message
-        });
+        if (t && !t.finished) {
+            try { await t.rollback(); } catch (rb) { console.error('Rollback error (cancelTransaction):', rb); }
+        }
+        throw error;
     }
-};
+});
 
 /**
  * Get transaction for printing
  * GET /api/transactions/:id/print?type=receipt|workorder
  */
-exports.getTransactionForPrint = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { type = 'receipt' } = req.query;
+exports.getTransactionForPrint = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { type = 'receipt' } = req.query;
 
-        const transaction = await Transaction.findByPk(id, {
-            include: [
-                { model: TransactionItem, as: 'items' },
-                { model: Payment, as: 'payments' },
-                { model: Vehicle, as: 'vehicle', include: [{ model: Customer, as: 'customer' }] },
-                { model: Mechanic, as: 'mechanic' },
-                { model: User, as: 'user', attributes: ['id', 'full_name'] }
-            ]
-        });
+    const transaction = await Transaction.findByPk(id, {
+        include: [
+            { model: TransactionItem, as: 'items' },
+            { model: Payment, as: 'payments' },
+            { model: Vehicle, as: 'vehicle', include: [{ model: Customer, as: 'customer' }] },
+            { model: Mechanic, as: 'mechanic' },
+            { model: User, as: 'user', attributes: ['id', 'full_name'] }
+        ]
+    });
 
-        if (!transaction) {
-            return res.status(404).json({
-                success: false,
-                message: 'Transaction not found'
-            });
-        }
-
-        // Format items based on print type
-        let formattedItems = transaction.items.map(item => ({
-            name: item.item_name,
-            qty: item.qty,
-            price: parseFloat(item.sell_price),
-            subtotal: parseFloat(item.sell_price) * item.qty,
-            type: item.item_type
-        }));
-
-        // For Work Order, explode packages to show components
-        if (type === 'workorder') {
-            const explodedItems = [];
-            
-            for (const item of transaction.items) {
-                if (item.item_type === 'PACKAGE') {
-                    explodedItems.push({
-                        name: `📦 ${item.item_name}`,
-                        qty: item.qty,
-                        price: parseFloat(item.sell_price),
-                        subtotal: parseFloat(item.sell_price) * item.qty,
-                        type: 'PACKAGE_HEADER',
-                        is_header: true
-                    });
-
-                    const pkg = await Package.findByPk(item.item_id, {
-                        include: [{
-                            model: PackageItem,
-                            as: 'items',
-                            include: [
-                                { model: Product, as: 'product' },
-                                { model: Service, as: 'service' }
-                            ]
-                        }]
-                    });
-
-                    if (pkg) {
-                        for (const pkgItem of pkg.items) {
-                            const componentName = pkgItem.product 
-                                ? pkgItem.product.name 
-                                : pkgItem.service?.name || 'Unknown';
-                            
-                            explodedItems.push({
-                                name: `   ↳ ${componentName}`,
-                                qty: pkgItem.qty * item.qty,
-                                price: null,
-                                subtotal: null,
-                                type: pkgItem.product ? 'PRODUCT' : 'SERVICE',
-                                is_component: true
-                            });
-                        }
-                    }
-                } else {
-                    explodedItems.push({
-                        name: item.item_name,
-                        qty: item.qty,
-                        price: parseFloat(item.sell_price),
-                        subtotal: parseFloat(item.sell_price) * item.qty,
-                        type: item.item_type
-                    });
-                }
-            }
-
-            formattedItems = explodedItems;
-        }
-
-        const totalPaid = transaction.payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
-
-        res.status(200).json({
-            success: true,
-            data: {
-                print_type: type,
-                transaction_id: transaction.id,
-                date: transaction.date,
-                status: transaction.status,
-                cashier: transaction.user?.full_name,
-                mechanic: transaction.mechanic?.name,
-                customer: transaction.vehicle?.customer ? {
-                    name: transaction.vehicle.customer.name,
-                    phone: transaction.vehicle.customer.phone
-                } : null,
-                vehicle: transaction.vehicle ? {
-                    license_plate: transaction.vehicle.license_plate,
-                    brand: transaction.vehicle.brand,
-                    model: transaction.vehicle.model,
-                    current_km: transaction.current_km
-                } : null,
-                items: formattedItems,
-                subtotal: parseFloat(transaction.subtotal),
-                discount: parseFloat(transaction.discount_amount),
-                total: parseFloat(transaction.total_amount),
-                paid: totalPaid,
-                remaining: Math.max(0, parseFloat(transaction.total_amount) - totalPaid),
-                payments: transaction.payments.map(p => ({
-                    method: p.payment_method,
-                    amount: parseFloat(p.amount),
-                    date: p.date,
-                    reference: p.reference_number
-                })),
-                notes: transaction.notes
-            }
-        });
-
-    } catch (error) {
-        console.error('Get print data error:', error);
-        res.status(500).json({
+    if (!transaction) {
+        return res.status(404).json({
             success: false,
-            message: 'Error generating print data',
-            error: error.message
+            message: 'Transaction not found'
         });
     }
-};
+
+    // Format items based on print type
+    let formattedItems = transaction.items.map(item => ({
+        name: item.item_name,
+        qty: item.qty,
+        price: parseFloat(item.sell_price),
+        subtotal: parseFloat(item.sell_price) * item.qty,
+        type: item.item_type
+    }));
+
+    // For Work Order, explode packages to show components.
+    if (type === 'workorder') {
+        // Bulk-fetch every package referenced on this work order in a single query
+        // (avoids an N+1 findByPk per PACKAGE line).
+        const packageItemIds = [...new Set(
+            transaction.items
+                .filter(it => it.item_type === ITEM_TYPE.PACKAGE && it.item_id)
+                .map(it => it.item_id)
+        )];
+
+        const packageMap = {};
+        if (packageItemIds.length > 0) {
+            const pkgs = await Package.findAll({
+                where: { id: packageItemIds },
+                include: [{
+                    model: PackageItem,
+                    as: 'items',
+                    include: [
+                        { model: Product, as: 'product' },
+                        { model: Service, as: 'service' }
+                    ]
+                }]
+            });
+            for (const pkg of pkgs) packageMap[pkg.id] = pkg;
+        }
+
+        const explodedItems = [];
+
+        for (const item of transaction.items) {
+            if (item.item_type === ITEM_TYPE.PACKAGE) {
+                explodedItems.push({
+                    name: `📦 ${item.item_name}`,
+                    qty: item.qty,
+                    price: parseFloat(item.sell_price),
+                    subtotal: parseFloat(item.sell_price) * item.qty,
+                    type: 'PACKAGE_HEADER',
+                    is_header: true
+                });
+
+                const pkg = packageMap[item.item_id];
+
+                if (pkg) {
+                    for (const pkgItem of pkg.items) {
+                        const componentName = pkgItem.product
+                            ? pkgItem.product.name
+                            : pkgItem.service?.name || 'Unknown';
+
+                        explodedItems.push({
+                            name: `   ↳ ${componentName}`,
+                            qty: pkgItem.qty * item.qty,
+                            price: null,
+                            subtotal: null,
+                            type: pkgItem.product ? ITEM_TYPE.PRODUCT : ITEM_TYPE.SERVICE,
+                            is_component: true
+                        });
+                    }
+                }
+            } else {
+                explodedItems.push({
+                    name: item.item_name,
+                    qty: item.qty,
+                    price: parseFloat(item.sell_price),
+                    subtotal: parseFloat(item.sell_price) * item.qty,
+                    type: item.item_type
+                });
+            }
+        }
+
+        formattedItems = explodedItems;
+    }
+
+    const totalPaid = transaction.payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+    res.status(200).json({
+        success: true,
+        data: {
+            print_type: type,
+            transaction_id: transaction.id,
+            date: transaction.date,
+            status: transaction.status,
+            cashier: transaction.user?.full_name,
+            mechanic: transaction.mechanic?.name,
+            customer: transaction.vehicle?.customer ? {
+                name: transaction.vehicle.customer.name,
+                phone: transaction.vehicle.customer.phone
+            } : null,
+            vehicle: transaction.vehicle ? {
+                license_plate: transaction.vehicle.license_plate,
+                brand: transaction.vehicle.brand,
+                model: transaction.vehicle.model,
+                current_km: transaction.current_km
+            } : null,
+            items: formattedItems,
+            subtotal: parseFloat(transaction.subtotal),
+            discount: parseFloat(transaction.discount_amount),
+            total: parseFloat(transaction.total_amount),
+            paid: totalPaid,
+            remaining: Math.max(0, parseFloat(transaction.total_amount) - totalPaid),
+            payments: transaction.payments.map(p => ({
+                method: p.payment_method,
+                amount: parseFloat(p.amount),
+                date: p.date,
+                reference: p.reference_number
+            })),
+            notes: transaction.notes
+        }
+    });
+});

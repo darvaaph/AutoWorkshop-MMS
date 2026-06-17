@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatDateTime } from '@/lib/format';
 
 type Tab = 'IN' | 'AUDIT' | 'HISTORY';
 
@@ -51,16 +52,6 @@ const auditSchema = z.object({
 
 type StockInForm = z.infer<typeof stockInSchema>;
 type AuditForm = z.infer<typeof auditSchema>;
-
-function formatDate(iso: string) {
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(iso));
-}
 
 export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState<Tab>('IN');
@@ -368,7 +359,7 @@ export default function InventoryPage() {
                         className="text-[11.5px] text-slate-500"
                         style={{ fontFamily: 'ui-monospace, monospace' }}
                       >
-                        {formatDate(log.created_at)}
+                        {formatDateTime(log.created_at)}
                       </div>
 
                       <div

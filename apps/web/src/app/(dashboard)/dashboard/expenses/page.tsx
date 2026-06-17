@@ -13,7 +13,7 @@ import {
   useDeleteExpense,
 } from '@/hooks/use-expenses';
 import type { Expense, ExpenseCategory } from '@/lib/api/expenses';
-import { formatRupiah } from '@/lib/format';
+import { formatRupiah, formatDate } from '@/lib/format';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,14 +55,6 @@ type ExpenseForm = z.infer<typeof expenseSchema>;
 
 function todayDate() {
   return new Date().toISOString().split('T')[0];
-}
-
-function formatDate(iso: string) {
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(iso));
 }
 
 export default function ExpensesPage() {

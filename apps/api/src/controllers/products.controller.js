@@ -6,6 +6,8 @@ const Package = require('../models/package.model');
 const PackageItem = require('../models/package-item.model');
 const InventoryLog = require('../models/inventory-log.model');
 const auditService = require('../services/audit.service');
+const asyncHandler = require('../utils/async-handler');
+const { INVENTORY_TYPE, INVENTORY_REFERENCE } = require('../utils/constants');
 const { sequelize } = require('../config/database');
 const path = require('path');
 const fs = require('fs');
@@ -14,147 +16,129 @@ const fs = require('fs');
  * Get all products with search & filter
  * GET /api/products?search=oli&category=Oli Mesin&page=1&limit=10
  */
-exports.getAllProducts = async (req, res) => {
-    try {
-        const { 
-            search, 
-            category, 
-            low_stock,
-            page = 1, 
-            limit = 50,
-            sort_by = 'name',
-            sort_order = 'ASC'
-        } = req.query;
+exports.getAllProducts = asyncHandler(async (req, res) => {
+    const {
+        search,
+        category,
+        low_stock,
+        page = 1,
+        limit = 50,
+        sort_by = 'name',
+        sort_order = 'ASC'
+    } = req.query;
 
-        // Build where clause
-        const where = {
-            deleted_at: null
-        };
+    // Build where clause
+    const where = {
+        deleted_at: null
+    };
 
-        // Search by name or SKU
-        if (search) {
-            where[Op.or] = [
-                { name: { [Op.like]: `%${search}%` } },
-                { sku: { [Op.like]: `%${search}%` } }
-            ];
-        }
-
-        // Filter by category
-        if (category) {
-            where.category = category;
-        }
-
-        // Filter low stock products
-        if (low_stock === 'true') {
-            where.stock = {
-                [Op.lte]: sequelize.col('min_stock_alert')
-            };
-        }
-
-        // Pagination
-        const offset = (parseInt(page) - 1) * parseInt(limit);
-
-        // Validate sort column
-        const allowedSortColumns = ['name', 'sku', 'category', 'price_sell', 'stock', 'created_at'];
-        const sortColumn = allowedSortColumns.includes(sort_by) ? sort_by : 'name';
-        const sortDir = sort_order.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
-
-        const { count, rows: products } = await Product.findAndCountAll({
-            where,
-            order: [[sortColumn, sortDir]],
-            limit: parseInt(limit),
-            offset,
-            attributes: {
-                exclude: ['deleted_at']
-            }
-        });
-
-        // Get distinct categories for filter dropdown
-        const categories = await Product.findAll({
-            where: { deleted_at: null },
-            attributes: [[sequelize.fn('DISTINCT', sequelize.col('category')), 'category']],
-            raw: true
-        });
-
-        res.status(200).json({
-            success: true,
-            data: {
-                products,
-                categories: categories.map(c => c.category).filter(Boolean),
-                pagination: {
-                    total: count,
-                    page: parseInt(page),
-                    limit: parseInt(limit),
-                    total_pages: Math.ceil(count / parseInt(limit))
-                }
-            }
-        });
-    } catch (error) {
-        console.error('Get products error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error retrieving products', 
-            error: error.message 
-        });
+    // Search by name or SKU
+    if (search) {
+        where[Op.or] = [
+            { name: { [Op.like]: `%${search}%` } },
+            { sku: { [Op.like]: `%${search}%` } }
+        ];
     }
-};
+
+    // Filter by category
+    if (category) {
+        where.category = category;
+    }
+
+    // Filter low stock products
+    if (low_stock === 'true') {
+        where.stock = {
+            [Op.lte]: sequelize.col('min_stock_alert')
+        };
+    }
+
+    // Pagination
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    // Validate sort column
+    const allowedSortColumns = ['name', 'sku', 'category', 'price_sell', 'stock', 'created_at'];
+    const sortColumn = allowedSortColumns.includes(sort_by) ? sort_by : 'name';
+    const sortDir = sort_order.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
+    const { count, rows: products } = await Product.findAndCountAll({
+        where,
+        order: [[sortColumn, sortDir]],
+        limit: parseInt(limit),
+        offset,
+        attributes: {
+            exclude: ['deleted_at']
+        }
+    });
+
+    // Get distinct categories for filter dropdown
+    const categories = await Product.findAll({
+        where: { deleted_at: null },
+        attributes: [[sequelize.fn('DISTINCT', sequelize.col('category')), 'category']],
+        raw: true
+    });
+
+    res.status(200).json({
+        success: true,
+        data: {
+            products,
+            categories: categories.map(c => c.category).filter(Boolean),
+            pagination: {
+                total: count,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total_pages: Math.ceil(count / parseInt(limit))
+            }
+        }
+    });
+});
 
 /**
  * Get single product by ID
  * GET /api/products/:id
  */
-exports.getProductById = async (req, res) => {
-    try {
-        const { id } = req.params;
+exports.getProductById = asyncHandler(async (req, res) => {
+    const { id } = req.params;
 
-        const product = await Product.findOne({
-            where: { 
-                id,
-                deleted_at: null 
-            },
-            attributes: {
-                exclude: ['deleted_at']
-            }
-        });
-
-        if (!product) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'Product not found' 
-            });
+    const product = await Product.findOne({
+        where: {
+            id,
+            deleted_at: null
+        },
+        attributes: {
+            exclude: ['deleted_at']
         }
+    });
 
-        res.status(200).json({
-            success: true,
-            data: product
-        });
-    } catch (error) {
-        console.error('Get product error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error retrieving product', 
-            error: error.message 
+    if (!product) {
+        return res.status(404).json({
+            success: false,
+            message: 'Product not found'
         });
     }
-};
+
+    res.status(200).json({
+        success: true,
+        data: product
+    });
+});
 
 /**
  * Create new product
  * POST /api/products
  */
-exports.createProduct = async (req, res) => {
+exports.createProduct = asyncHandler(async (req, res) => {
     const t = await sequelize.transaction();
 
     try {
-        const { 
-            sku, 
-            name, 
-            category, 
+        const {
+            sku,
+            name,
+            category,
             image_url,
-            price_buy, 
-            price_sell, 
+            price_buy,
+            price_sell,
             stock = 0,
-            min_stock_alert = 5 
+            min_stock_alert = 5
         } = req.body;
 
         // Handle image upload if provided
@@ -193,8 +177,8 @@ exports.createProduct = async (req, res) => {
         }
 
         // Check if SKU already exists
-        const existingSku = await Product.findOne({ 
-            where: { sku: sku.toUpperCase() } 
+        const existingSku = await Product.findOne({
+            where: { sku: sku.toUpperCase() }
         });
 
         if (existingSku) {
@@ -222,11 +206,11 @@ exports.createProduct = async (req, res) => {
             await InventoryLog.create({
                 product_id: product.id,
                 user_id: req.user?.id,
-                type: 'IN',
+                type: INVENTORY_TYPE.IN,
                 qty: stock,
                 stock_before: 0,
                 stock_after: stock,
-                reference_type: 'PURCHASE',
+                reference_type: INVENTORY_REFERENCE.PURCHASE,
                 reference_id: `INIT-${product.id}`,
                 notes: 'Initial stock saat produk dibuat'
             }, { transaction: t });
@@ -250,35 +234,32 @@ exports.createProduct = async (req, res) => {
             data: product
         });
     } catch (error) {
-        await t.rollback();
-        // Delete uploaded file on error
+        if (t && !t.finished) {
+            try { await t.rollback(); } catch (rb) { console.error('Rollback error (createProduct):', rb); }
+        }
+        // Clean up the orphaned upload before delegating to the global handler.
         if (req.file && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }
-        console.error('Create product error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error creating product', 
-            error: error.message 
-        });
+        throw error;
     }
-};
+});
 
 /**
  * Update product
  * PUT /api/products/:id
  */
-exports.updateProduct = async (req, res) => {
+exports.updateProduct = asyncHandler(async (req, res) => {
     try {
         const { id } = req.params;
-        const { 
-            sku, 
-            name, 
-            category, 
+        const {
+            sku,
+            name,
+            category,
             image_url,
-            price_buy, 
-            price_sell, 
-            min_stock_alert 
+            price_buy,
+            price_sell,
+            min_stock_alert
         } = req.body;
 
         // Handle image upload if provided
@@ -307,19 +288,19 @@ exports.updateProduct = async (req, res) => {
         });
 
         if (!product) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'Product not found' 
+            return res.status(404).json({
+                success: false,
+                message: 'Product not found'
             });
         }
 
         // Check SKU uniqueness if changed
         if (sku && sku.toUpperCase() !== product.sku) {
-            const existingSku = await Product.findOne({ 
-                where: { 
+            const existingSku = await Product.findOne({
+                where: {
                     sku: sku.toUpperCase(),
                     id: { [Op.ne]: id }
-                } 
+                }
             });
 
             if (existingSku) {
@@ -373,132 +354,109 @@ exports.updateProduct = async (req, res) => {
             data: product
         });
     } catch (error) {
-        // Delete uploaded file on error
+        // Clean up the orphaned upload before delegating to the global handler.
         if (req.file && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }
-        console.error('Update product error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error updating product', 
-            error: error.message 
-        });
+        throw error;
     }
-};
+});
 
 /**
  * Soft delete product
  * DELETE /api/products/:id
  */
-exports.deleteProduct = async (req, res) => {
-    try {
-        const { id } = req.params;
+exports.deleteProduct = asyncHandler(async (req, res) => {
+    const { id } = req.params;
 
-        const product = await Product.findOne({
-            where: { id, deleted_at: null }
-        });
+    const product = await Product.findOne({
+        where: { id, deleted_at: null }
+    });
 
-        if (!product) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'Product not found' 
-            });
-        }
-
-        const activePackageItems = await PackageItem.findAll({
-            where: { product_id: id },
-            attributes: ['id', 'package_id'],
-            include: [
-                {
-                    model: Package,
-                    as: 'package',
-                    required: true,
-                    attributes: ['id', 'name'],
-                    where: { is_active: true }
-                }
-            ]
-        });
-
-        if (activePackageItems.length > 0) {
-            const impactedPackagesMap = new Map();
-            activePackageItems.forEach(item => {
-                if (item.package) {
-                    impactedPackagesMap.set(item.package.id, {
-                        id: item.package.id,
-                        name: item.package.name
-                    });
-                }
-            });
-
-            const impactedPackages = Array.from(impactedPackagesMap.values());
-
-            return res.status(409).json({
-                success: false,
-                message: 'Produk masih digunakan oleh paket aktif. Hapus dari paket/nonaktifkan paket terlebih dahulu.',
-                data: {
-                    impacted_packages: impactedPackages
-                }
-            });
-        }
-
-        // Soft delete
-        await product.destroy();
-
-        // Audit log for product deletion
-        await auditService.logDelete(req.user.id, 'products', product.id, {
-            sku: product.sku,
-            name: product.name,
-            category: product.category
-        }, req);
-
-        res.status(200).json({
-            success: true,
-            message: 'Product deleted successfully'
-        });
-    } catch (error) {
-        console.error('Delete product error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error deleting product', 
-            error: error.message 
+    if (!product) {
+        return res.status(404).json({
+            success: false,
+            message: 'Product not found'
         });
     }
-};
+
+    const activePackageItems = await PackageItem.findAll({
+        where: { product_id: id },
+        attributes: ['id', 'package_id'],
+        include: [
+            {
+                model: Package,
+                as: 'package',
+                required: true,
+                attributes: ['id', 'name'],
+                where: { is_active: true }
+            }
+        ]
+    });
+
+    if (activePackageItems.length > 0) {
+        const impactedPackagesMap = new Map();
+        activePackageItems.forEach(item => {
+            if (item.package) {
+                impactedPackagesMap.set(item.package.id, {
+                    id: item.package.id,
+                    name: item.package.name
+                });
+            }
+        });
+
+        const impactedPackages = Array.from(impactedPackagesMap.values());
+
+        return res.status(409).json({
+            success: false,
+            message: 'Produk masih digunakan oleh paket aktif. Hapus dari paket/nonaktifkan paket terlebih dahulu.',
+            data: {
+                impacted_packages: impactedPackages
+            }
+        });
+    }
+
+    // Soft delete
+    await product.destroy();
+
+    // Audit log for product deletion
+    await auditService.logDelete(req.user.id, 'products', product.id, {
+        sku: product.sku,
+        name: product.name,
+        category: product.category
+    }, req);
+
+    res.status(200).json({
+        success: true,
+        message: 'Product deleted successfully'
+    });
+});
 
 /**
  * Get low stock products for alert
  * GET /api/products/low-stock
  */
-exports.getLowStockProducts = async (req, res) => {
-    try {
-        const products = await Product.findAll({
-            where: {
-                deleted_at: null,
-                stock: {
-                    [Op.lte]: sequelize.col('min_stock_alert')
-                }
-            },
-            order: [['stock', 'ASC']],
-            attributes: ['id', 'sku', 'name', 'stock', 'min_stock_alert']
-        });
+exports.getLowStockProducts = asyncHandler(async (req, res) => {
+    const products = await Product.findAll({
+        where: {
+            deleted_at: null,
+            stock: {
+                [Op.lte]: sequelize.col('min_stock_alert')
+            }
+        },
+        order: [['stock', 'ASC']],
+        attributes: ['id', 'sku', 'name', 'stock', 'min_stock_alert']
+    });
 
-        res.status(200).json({
-            success: true,
-            data: products,
-            count: products.length
-        });
-    } catch (error) {
-        console.error('Get low stock error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error retrieving low stock products', 
-            error: error.message 
-        });
-    }
-};
+    res.status(200).json({
+        success: true,
+        data: products,
+        count: products.length
+    });
+});
 
 // Upload product image
-exports.uploadProductImage = async (req, res) => {
+exports.uploadProductImage = asyncHandler(async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -562,11 +520,10 @@ exports.uploadProductImage = async (req, res) => {
             product: product
         });
     } catch (error) {
-        // Delete uploaded file on error
+        // Clean up the orphaned upload before delegating to the global handler.
         if (req.file && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }
-        console.error('Upload product image error:', error);
-        return res.status(500).json({ message: 'Error uploading product image', error: error.message });
+        throw error;
     }
-};
+});

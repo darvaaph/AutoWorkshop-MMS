@@ -6,55 +6,139 @@ const path = require('path');
 const { sequelize } = require('../config/database');
 const Customer = require('../models/customer.model');
 const auditService = require('../services/audit.service');
+const asyncHandler = require('../utils/async-handler');
 
 // Get all customers
-exports.getAllCustomers = async (req, res) => {
-    try {
-        const { search } = req.query;
-        const where = search
-            ? {
-                [Op.or]: [
-                    { name: { [Op.like]: `%${search}%` } },
-                    { phone: { [Op.like]: `%${search}%` } },
-                ],
-            }
-            : undefined;
+exports.getAllCustomers = asyncHandler(async (req, res) => {
+    const { search } = req.query;
+    const where = search
+        ? {
+            [Op.or]: [
+                { name: { [Op.like]: `%${search}%` } },
+                { phone: { [Op.like]: `%${search}%` } },
+            ],
+        }
+        : undefined;
 
-        const customers = await Customer.findAll({
-            where,
-            attributes: ['id', 'name', 'phone', 'address', 'photo_url', 'createdAt', 'updatedAt'],
-            order: [['name', 'ASC']],
-        });
-        res.status(200).json({ success: true, data: customers });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Error retrieving customers', error });
-    }
-};
+    const customers = await Customer.findAll({
+        where,
+        attributes: ['id', 'name', 'phone', 'address', 'photo_url', 'createdAt', 'updatedAt'],
+        order: [['name', 'ASC']],
+    });
+    res.status(200).json({ success: true, data: customers });
+});
 
 // Get a single customer by ID
-exports.getCustomerById = async (req, res) => {
+exports.getCustomerById = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    try {
-        const customer = await Customer.findByPk(id, {
-            attributes: ['id', 'name', 'phone', 'address', 'photo_url', 'createdAt', 'updatedAt']
-        });
-        if (!customer) {
-            return res.status(404).json({ message: 'Customer not found' });
-        }
-        res.status(200).json({ success: true, data: customer });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Error retrieving customer', error });
+    const customer = await Customer.findByPk(id, {
+        attributes: ['id', 'name', 'phone', 'address', 'photo_url', 'createdAt', 'updatedAt']
+    });
+    if (!customer) {
+        return res.status(404).json({ message: 'Customer not found' });
     }
-};
+    res.status(200).json({ success: true, data: customer });
+});
 
 // Create a new customer
-exports.createCustomer = async (req, res) => {
+exports.createCustomer = asyncHandler(async (req, res) => {
     const { name, phone, address } = req.body;
+
+    // Check for duplicate phone number (excluding soft deleted customers)
+    const [existingCustomers] = await sequelize.query(
+        'SELECT id FROM customers WHERE phone = ? AND deleted_at IS NULL',
+        { replacements: [phone] }
+    );
+
+    if (existingCustomers.length > 0) {
+        return res.status(400).json({
+            message: 'Customer with this phone number already exists'
+        });
+    }
+
+    // Handle photo upload if provided
+    let photoUrl = null;
+    if (req.file) {
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+        if (!allowedTypes.includes(req.file.mimetype)) {
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid file type. Only JPEG, PNG, and GIF are allowed'
+            });
+        }
+
+        // Validate file size (max 2MB)
+        const maxSize = 2 * 1024 * 1024; // 2MB
+        if (req.file.size > maxSize) {
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({
+                success: false,
+                message: 'File too large. Maximum size is 2MB'
+            });
+        }
+
+        // Generate photo URL
+        photoUrl = `/uploads/customers/${req.file.filename}`;
+    }
+
+    const newCustomer = await Customer.create({ name, phone, address, photo_url: photoUrl });
+
+    // Audit log (optional)
     try {
-        // Check for duplicate phone number (excluding soft deleted customers)
+        await auditService.logCreate(req.user?.id, 'customers', newCustomer.id, {
+            name, phone, address, photo_url: photoUrl
+        }, req);
+    } catch (auditError) {
+        console.warn('Audit logging failed:', auditError.message);
+    }
+
+    res.status(201).json({ success: true, data: newCustomer });
+});
+
+// Update an existing customer
+exports.updateCustomer = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { name, phone, address } = req.body;
+
+    const customer = await Customer.findByPk(id);
+    if (!customer) {
+        return res.status(404).json({ message: 'Customer not found' });
+    }
+
+    // Handle photo upload if provided
+    let finalPhotoUrl = undefined;
+    if (req.file) {
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+        if (!allowedTypes.includes(req.file.mimetype)) {
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid file type. Only JPEG, PNG, and GIF are allowed'
+            });
+        }
+
+        // Validate file size (max 2MB)
+        const maxSize = 2 * 1024 * 1024; // 2MB
+        if (req.file.size > maxSize) {
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({
+                success: false,
+                message: 'File too large. Maximum size is 2MB'
+            });
+        }
+
+        // Generate photo URL
+        finalPhotoUrl = `/uploads/customers/${req.file.filename}`;
+    }
+
+    // Check for duplicate phone number (excluding soft deleted customers and current customer)
+    if (phone && phone !== customer.phone) {
         const [existingCustomers] = await sequelize.query(
-            'SELECT id FROM customers WHERE phone = ? AND deleted_at IS NULL',
-            { replacements: [phone] }
+            'SELECT id FROM customers WHERE phone = ? AND deleted_at IS NULL AND id != ?',
+            { replacements: [phone, id] }
         );
 
         if (existingCustomers.length > 0) {
@@ -62,183 +146,77 @@ exports.createCustomer = async (req, res) => {
                 message: 'Customer with this phone number already exists'
             });
         }
-
-        // Handle photo upload if provided
-        let photoUrl = null;
-        if (req.file) {
-            // Validate file type
-            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-            if (!allowedTypes.includes(req.file.mimetype)) {
-                fs.unlinkSync(req.file.path);
-                return res.status(400).json({
-                    success: false,
-                    message: 'Invalid file type. Only JPEG, PNG, and GIF are allowed'
-                });
-            }
-
-            // Validate file size (max 2MB)
-            const maxSize = 2 * 1024 * 1024; // 2MB
-            if (req.file.size > maxSize) {
-                fs.unlinkSync(req.file.path);
-                return res.status(400).json({
-                    success: false,
-                    message: 'File too large. Maximum size is 2MB'
-                });
-            }
-
-            // Generate photo URL
-            photoUrl = `/uploads/customers/${req.file.filename}`;
-        }
-
-        const newCustomer = await Customer.create({ name, phone, address, photo_url: photoUrl });
-        
-        // Audit log (optional)
-        try {
-            await auditService.logCreate(req.user?.id, 'customers', newCustomer.id, {
-                name, phone, address, photo_url: photoUrl
-            }, req);
-        } catch (auditError) {
-            console.warn('Audit logging failed:', auditError.message);
-        }
-        
-        res.status(201).json({ success: true, data: newCustomer });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Error creating customer', error });
     }
-};
 
-// Update an existing customer
-exports.updateCustomer = async (req, res) => {
-    const { id } = req.params;
-    const { name, phone, address } = req.body;
+    const oldValues = { name: customer.name, phone: customer.phone, address: customer.address, photo_url: customer.photo_url };
+
+    // Only update fields that are provided
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (phone !== undefined) updateData.phone = phone;
+    if (address !== undefined) updateData.address = address;
+    if (finalPhotoUrl !== undefined) updateData.photo_url = finalPhotoUrl;
+
+    // Delete old photo file if new photo is uploaded
+    if (req.file && customer.photo_url && customer.photo_url.startsWith('/uploads/')) {
+        const oldPhotoPath = path.join(__dirname, '../../public', customer.photo_url);
+        if (fs.existsSync(oldPhotoPath)) {
+            fs.unlinkSync(oldPhotoPath);
+        }
+    }
+
+    await customer.update(updateData);
+
+    // Audit log (optional)
     try {
-        const customer = await Customer.findByPk(id);
-        if (!customer) {
-            return res.status(404).json({ message: 'Customer not found' });
-        }
-
-        // Handle photo upload if provided
-        let finalPhotoUrl = undefined;
-        if (req.file) {
-            // Validate file type
-            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-            if (!allowedTypes.includes(req.file.mimetype)) {
-                fs.unlinkSync(req.file.path);
-                return res.status(400).json({
-                    success: false,
-                    message: 'Invalid file type. Only JPEG, PNG, and GIF are allowed'
-                });
-            }
-
-            // Validate file size (max 2MB)
-            const maxSize = 2 * 1024 * 1024; // 2MB
-            if (req.file.size > maxSize) {
-                fs.unlinkSync(req.file.path);
-                return res.status(400).json({
-                    success: false,
-                    message: 'File too large. Maximum size is 2MB'
-                });
-            }
-
-            // Generate photo URL
-            finalPhotoUrl = `/uploads/customers/${req.file.filename}`;
-        }
-
-        // Check for duplicate phone number (excluding soft deleted customers and current customer)
-        if (phone && phone !== customer.phone) {
-            const [existingCustomers] = await sequelize.query(
-                'SELECT id FROM customers WHERE phone = ? AND deleted_at IS NULL AND id != ?',
-                { replacements: [phone, id] }
-            );
-
-            if (existingCustomers.length > 0) {
-                return res.status(400).json({
-                    message: 'Customer with this phone number already exists'
-                });
-            }
-        }
-        
-        const oldValues = { name: customer.name, phone: customer.phone, address: customer.address, photo_url: customer.photo_url };
-        
-        // Only update fields that are provided
-        const updateData = {};
-        if (name !== undefined) updateData.name = name;
-        if (phone !== undefined) updateData.phone = phone;
-        if (address !== undefined) updateData.address = address;
-        if (finalPhotoUrl !== undefined) updateData.photo_url = finalPhotoUrl;
-        
-        // Delete old photo file if new photo is uploaded
-        if (req.file && customer.photo_url && customer.photo_url.startsWith('/uploads/')) {
-            const oldPhotoPath = path.join(__dirname, '../../public', customer.photo_url);
-            if (fs.existsSync(oldPhotoPath)) {
-                fs.unlinkSync(oldPhotoPath);
-            }
-        }
-        
-        await customer.update(updateData);
-        
-        // Audit log (optional)
-        try {
-            await auditService.logUpdate(req.user?.id, 'customers', customer.id, oldValues, {
-                name: customer.name,
-                phone: customer.phone,
-                address: customer.address,
-                photo_url: customer.photo_url
-            }, req);
-        } catch (auditError) {
-            console.warn('Audit logging failed:', auditError.message);
-        }
-        
-        res.status(200).json({ success: true, data: customer });
-    } catch (error) {
-        console.error('Update customer error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error updating customer',
-            error: error.message || 'Unknown error',
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
+        await auditService.logUpdate(req.user?.id, 'customers', customer.id, oldValues, {
+            name: customer.name,
+            phone: customer.phone,
+            address: customer.address,
+            photo_url: customer.photo_url
+        }, req);
+    } catch (auditError) {
+        console.warn('Audit logging failed:', auditError.message);
     }
-};
+
+    res.status(200).json({ success: true, data: customer });
+});
 
 // Delete a customer
-exports.deleteCustomer = async (req, res) => {
+exports.deleteCustomer = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    try {
-        const customer = await Customer.findByPk(id);
-        if (!customer) {
-            return res.status(404).json({ message: 'Customer not found' });
-        }
-        
-        const oldValues = { name: customer.name, phone: customer.phone, address: customer.address };
-        
-        // Soft delete all vehicles associated with this customer
-        const Vehicle = require('../models/vehicle.model');
-        await Vehicle.destroy({
-            where: { customer_id: id }
-        });
-        
-        // Soft delete the customer
-        await customer.destroy();
-        
-        // Audit log (optional)
-        try {
-            await auditService.logDelete(req.user?.id, 'customers', id, oldValues, req);
-        } catch (auditError) {
-            console.warn('Audit logging failed:', auditError.message);
-        }
-        
-        res.status(200).json({ success: true, message: 'Customer and associated vehicles deleted successfully' });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Error deleting customer', error });
+
+    const customer = await Customer.findByPk(id);
+    if (!customer) {
+        return res.status(404).json({ message: 'Customer not found' });
     }
-};
+
+    const oldValues = { name: customer.name, phone: customer.phone, address: customer.address };
+
+    // Soft delete all vehicles associated with this customer
+    const Vehicle = require('../models/vehicle.model');
+    await Vehicle.destroy({
+        where: { customer_id: id }
+    });
+
+    // Soft delete the customer
+    await customer.destroy();
+
+    // Audit log (optional)
+    try {
+        await auditService.logDelete(req.user?.id, 'customers', id, oldValues, req);
+    } catch (auditError) {
+        console.warn('Audit logging failed:', auditError.message);
+    }
+
+    res.status(200).json({ success: true, message: 'Customer and associated vehicles deleted successfully' });
+});
 
 /**
  * Upload customer photo
  * POST /api/customers/:id/upload-photo
  */
-exports.uploadCustomerPhoto = async (req, res) => {
+exports.uploadCustomerPhoto = asyncHandler(async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -308,15 +286,10 @@ exports.uploadCustomerPhoto = async (req, res) => {
             }
         });
     } catch (error) {
-        // Delete uploaded file on error
+        // Clean up the orphaned upload before delegating to the global handler.
         if (req.file && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }
-        console.error('Upload customer photo error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error uploading customer photo',
-            error: error.message
-        });
+        throw error;
     }
-};
+});

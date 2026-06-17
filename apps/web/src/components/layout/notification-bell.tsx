@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bell, CheckCircle2, MessageCircle } from 'lucide-react';
 import { useDueServiceVehicles } from '@/hooks/use-dashboard';
 import { useMarkContacted } from '@/hooks/use-vehicles';
 import { toWaPhone } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import {
   Sheet,
   SheetContent,
@@ -50,6 +51,17 @@ export function NotificationBell() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [contactTarget, setContactTarget] = useState<DueServiceVehicle | null>(null);
   const [notes, setNotes] = useState('');
+  // Responsive panel: bottom-sheet on mobile, right-drawer on desktop.
+  // Defaults to mobile (false) for SSR; resolves before the sheet is ever opened.
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
 
   const { data: dueVehicles = [], isLoading } = useDueServiceVehicles();
   const markContacted = useMarkContacted();
@@ -93,8 +105,13 @@ export function NotificationBell() {
       {/* Notification sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent
-          side="bottom"
-          className="rounded-t-2xl p-0 max-h-[85dvh] overflow-y-auto pb-safe"
+          side={isDesktop ? 'right' : 'bottom'}
+          className={cn(
+            'p-0 overflow-y-auto',
+            isDesktop
+              ? 'w-full sm:max-w-md'
+              : 'rounded-t-2xl max-h-[85dvh] pb-safe'
+          )}
         >
           <SheetHeader className="px-5 pt-5 pb-3 border-b text-left">
             <SheetTitle className="flex items-center gap-2">

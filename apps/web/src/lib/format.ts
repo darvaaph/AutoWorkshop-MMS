@@ -42,6 +42,20 @@ export function formatDate(date: string | null | undefined): string {
   }).format(d);
 }
 
+/** Date + time (e.g. "17 Jun 2026, 14.30") — used by transaction/inventory/audit lists. */
+export function formatDateTime(date: string | null | undefined): string {
+  if (!date) return '-';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '-';
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d);
+}
+
 export function formatKm(km: number | null | undefined): string {
   if (km == null) return '-';
   return `${km.toLocaleString('id-ID')} km`;
