@@ -3,6 +3,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
+const AppError = require('../utils/app-error');
 
 class AuthService {
     /**
@@ -18,19 +19,19 @@ class AuthService {
         });
         
         if (!user) {
-            throw new Error('Username atau password salah');
+            throw new AppError(401, 'Username atau password salah');
         }
 
         // Check if user is active
         if (!user.is_active) {
-            throw new Error('Akun tidak aktif. Hubungi administrator.');
+            throw new AppError(403, 'Akun tidak aktif. Hubungi administrator.');
         }
 
         // Verify password
         const isValidPassword = await bcrypt.compare(password, user.password);
-        
+
         if (!isValidPassword) {
-            throw new Error('Username atau password salah');
+            throw new AppError(401, 'Username atau password salah');
         }
 
         // Generate JWT token (expires in 1 day)
@@ -68,7 +69,7 @@ class AuthService {
         });
         
         if (existingUser) {
-            throw new Error('Username sudah digunakan');
+            throw new AppError(409, 'Username sudah digunakan');
         }
 
         // Hash password
@@ -99,16 +100,16 @@ class AuthService {
      */
     async changePassword(userId, oldPassword, newPassword) {
         const user = await User.findByPk(userId);
-        
+
         if (!user) {
-            throw new Error('User tidak ditemukan');
+            throw new AppError(404, 'User tidak ditemukan');
         }
 
         // Verify old password
         const isValidPassword = await bcrypt.compare(oldPassword, user.password);
-        
+
         if (!isValidPassword) {
-            throw new Error('Password lama salah');
+            throw new AppError(400, 'Password lama salah');
         }
 
         // Hash new password
@@ -131,7 +132,7 @@ class AuthService {
         });
         
         if (!user) {
-            throw new Error('User tidak ditemukan');
+            throw new AppError(404, 'User tidak ditemukan');
         }
 
         return user;
@@ -157,7 +158,7 @@ class AuthService {
         const user = await User.findByPk(userId);
         
         if (!user) {
-            throw new Error('User tidak ditemukan');
+            throw new AppError(404, 'User tidak ditemukan');
         }
 
         await user.update({ is_active: isActive });

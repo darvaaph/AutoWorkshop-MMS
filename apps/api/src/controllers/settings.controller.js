@@ -3,44 +3,39 @@
 const Settings = require('../models/setting.model');
 const path = require('path');
 const fs = require('fs');
+const asyncHandler = require('../utils/async-handler');
 
 // Get all settings
-exports.getSettings = async (req, res) => {
-    try {
-        const settings = await Settings.findOne();
-        return res.status(200).json(settings);
-    } catch (error) {
-        return res.status(500).json({ message: 'Error retrieving settings', error });
+exports.getSettings = asyncHandler(async (req, res) => {
+    const settings = await Settings.findOne();
+    if (!settings) {
+        return res.status(404).json({ success: false, message: 'Settings not found' });
     }
-};
+    return res.status(200).json({ success: true, data: settings });
+});
 
 // Update settings
-exports.updateSettings = async (req, res) => {
-    try {
-        const { shop_name, shop_address, shop_phone, printer_width, footer_message, shop_logo_url } = req.body;
-        const settings = await Settings.findOne();
+exports.updateSettings = asyncHandler(async (req, res) => {
+    const { shop_name, shop_address, shop_phone, printer_width, footer_message, shop_logo_url } = req.body;
+    const settings = await Settings.findOne();
 
-        if (!settings) {
-            return res.status(404).json({ message: 'Settings not found' });
-        }
-
-        // Update fields if provided
-        if (shop_name !== undefined) settings.shop_name = shop_name;
-        if (shop_address !== undefined) settings.shop_address = shop_address;
-        if (shop_phone !== undefined) settings.shop_phone = shop_phone;
-        if (printer_width !== undefined) settings.printer_width = printer_width;
-        if (footer_message !== undefined) settings.footer_message = footer_message;
-        if (shop_logo_url !== undefined) settings.shop_logo_url = shop_logo_url;
-
-        await settings.save();
-        return res.status(200).json(settings);
-    } catch (error) {
-        return res.status(500).json({ message: 'Error updating settings', error });
+    if (!settings) {
+        return res.status(404).json({ success: false, message: 'Settings not found' });
     }
-};
+
+    if (shop_name !== undefined) settings.shop_name = shop_name;
+    if (shop_address !== undefined) settings.shop_address = shop_address;
+    if (shop_phone !== undefined) settings.shop_phone = shop_phone;
+    if (printer_width !== undefined) settings.printer_width = printer_width;
+    if (footer_message !== undefined) settings.footer_message = footer_message;
+    if (shop_logo_url !== undefined) settings.shop_logo_url = shop_logo_url;
+
+    await settings.save();
+    return res.status(200).json({ success: true, data: settings });
+});
 
 // Upload logo
-exports.uploadLogo = async (req, res) => {
+exports.uploadLogo = asyncHandler(async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: 'No logo file uploaded' });
@@ -82,16 +77,12 @@ exports.uploadLogo = async (req, res) => {
         settings.shop_logo_url = logoUrl;
         await settings.save();
 
-        return res.status(200).json({
-            message: 'Logo uploaded successfully',
-            logo_url: logoUrl,
-            settings: settings
-        });
+        return res.status(200).json({ success: true, data: settings });
     } catch (error) {
-        // Delete uploaded file on error
+        // Clean up the orphaned upload before delegating to the global handler.
         if (req.file && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }
-        return res.status(500).json({ message: 'Error uploading logo', error });
+        throw error;
     }
-};
+});

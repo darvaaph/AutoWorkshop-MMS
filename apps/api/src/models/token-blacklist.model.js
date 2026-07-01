@@ -27,7 +27,7 @@ const TokenBlacklist = sequelize.define('TokenBlacklist', {
     underscored: true,
     indexes: [
         {
-            fields: ['token(255)'], // Index hanya 255 karakter pertama
+            fields: [{ name: 'token', length: 255 }], // Index 255 karakter pertama (kolom TEXT)
         },
         {
             fields: ['expires_at'],

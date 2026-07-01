@@ -2,58 +2,41 @@
 
 const Mechanic = require('../models/mechanic.model');
 const auditService = require('../services/audit.service');
+const asyncHandler = require('../utils/async-handler');
 const path = require('path');
 const fs = require('fs');
 
 // Get all mechanics (Public - basic info only)
-exports.getAllMechanics = async (req, res) => {
-    try {
-        const mechanics = await Mechanic.findAll({
-            attributes: ['id', 'name', 'is_active', 'photo_url', 'createdAt', 'updatedAt']
-        });
-        res.status(200).json({
-            success: true,
-            data: mechanics
-        });
-    } catch (error) {
-        console.error('Get mechanics error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error retrieving mechanics',
-            error: error.message
-        });
-    }
-};
+exports.getAllMechanics = asyncHandler(async (req, res) => {
+    const mechanics = await Mechanic.findAll({
+        attributes: ['id', 'name', 'is_active', 'photo_url', 'createdAt', 'updatedAt']
+    });
+    res.status(200).json({
+        success: true,
+        data: mechanics
+    });
+});
 
 // Get a mechanic by ID (Public - basic info only)
-exports.getMechanicById = async (req, res) => {
+exports.getMechanicById = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    try {
-        const mechanic = await Mechanic.findByPk(id, {
-            attributes: ['id', 'name', 'is_active', 'photo_url', 'createdAt', 'updatedAt']
-        });
-        if (!mechanic) {
-            return res.status(404).json({
-                success: false,
-                message: 'Mechanic not found'
-            });
-        }
-        res.status(200).json({
-            success: true,
-            data: mechanic
-        });
-    } catch (error) {
-        console.error('Get mechanic error:', error);
-        res.status(500).json({
+    const mechanic = await Mechanic.findByPk(id, {
+        attributes: ['id', 'name', 'is_active', 'photo_url', 'createdAt', 'updatedAt']
+    });
+    if (!mechanic) {
+        return res.status(404).json({
             success: false,
-            message: 'Error retrieving mechanic',
-            error: error.message
+            message: 'Mechanic not found'
         });
     }
-};
+    res.status(200).json({
+        success: true,
+        data: mechanic
+    });
+});
 
 // Upload mechanic photo
-exports.uploadMechanicPhoto = async (req, res) => {
+exports.uploadMechanicPhoto = asyncHandler(async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -123,114 +106,91 @@ exports.uploadMechanicPhoto = async (req, res) => {
             }
         });
     } catch (error) {
-        // Delete uploaded file on error
+        // Clean up the orphaned upload before delegating to the global handler.
         if (req.file && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }
-        console.error('Upload mechanic photo error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error uploading mechanic photo',
-            error: error.message
-        });
+        throw error;
     }
-};
+});
 
 // Get mechanic details (Admin only - includes sensitive data)
-exports.getMechanicDetails = async (req, res) => {
-    try {
-        const { id } = req.params;
+exports.getMechanicDetails = asyncHandler(async (req, res) => {
+    const { id } = req.params;
 
-        const mechanic = await Mechanic.findByPk(id, {
-            attributes: { exclude: ['deletedAt'] }
-        });
+    const mechanic = await Mechanic.findByPk(id, {
+        attributes: { exclude: ['deletedAt'] }
+    });
 
-        if (!mechanic) {
-            return res.status(404).json({
-                success: false,
-                message: 'Mechanic not found'
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            data: mechanic
-        });
-    } catch (error) {
-        console.error('Get mechanic details error:', error);
-        res.status(500).json({
+    if (!mechanic) {
+        return res.status(404).json({
             success: false,
-            message: 'Error retrieving mechanic details',
-            error: error.message
+            message: 'Mechanic not found'
         });
     }
-};
+
+    res.status(200).json({
+        success: true,
+        data: mechanic
+    });
+});
 
 // Update mechanic details (Admin only - sensitive data)
-exports.updateMechanicDetails = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { phone, address, emergency_contact } = req.body;
+exports.updateMechanicDetails = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { phone, address, emergency_contact } = req.body;
 
-        const mechanic = await Mechanic.findByPk(id);
+    const mechanic = await Mechanic.findByPk(id);
 
-        if (!mechanic) {
-            return res.status(404).json({
-                success: false,
-                message: 'Mechanic not found'
-            });
-        }
-
-        const oldValues = {
-            phone: mechanic.phone,
-            address: mechanic.address,
-            emergency_contact: mechanic.emergency_contact
-        };
-
-        // Only update provided fields
-        if (phone !== undefined) {
-            mechanic.phone = phone;
-        }
-        if (address !== undefined) {
-            mechanic.address = address;
-        }
-        if (emergency_contact !== undefined) {
-            mechanic.emergency_contact = emergency_contact;
-        }
-
-        await mechanic.save();
-
-        // Audit log for sensitive data changes
-        await auditService.logUpdate(req.user?.id, 'mechanics', mechanic.id, oldValues, {
-            phone: mechanic.phone,
-            address: mechanic.address,
-            emergency_contact: mechanic.emergency_contact
-        }, req);
-
-        res.status(200).json({
-            success: true,
-            message: 'Mechanic details updated successfully',
-            data: {
-                id: mechanic.id,
-                phone: mechanic.phone,
-                address: mechanic.address,
-                emergency_contact: mechanic.emergency_contact
-            }
-        });
-    } catch (error) {
-        console.error('Update mechanic details error:', error);
-        res.status(500).json({
+    if (!mechanic) {
+        return res.status(404).json({
             success: false,
-            message: 'Error updating mechanic details',
-            error: error.message
+            message: 'Mechanic not found'
         });
     }
-};
+
+    const oldValues = {
+        phone: mechanic.phone,
+        address: mechanic.address,
+        emergency_contact: mechanic.emergency_contact
+    };
+
+    // Only update provided fields
+    if (phone !== undefined) {
+        mechanic.phone = phone;
+    }
+    if (address !== undefined) {
+        mechanic.address = address;
+    }
+    if (emergency_contact !== undefined) {
+        mechanic.emergency_contact = emergency_contact;
+    }
+
+    await mechanic.save();
+
+    // Audit log for sensitive data changes
+    await auditService.logUpdate(req.user?.id, 'mechanics', mechanic.id, oldValues, {
+        phone: mechanic.phone,
+        address: mechanic.address,
+        emergency_contact: mechanic.emergency_contact
+    }, req);
+
+    res.status(200).json({
+        success: true,
+        message: 'Mechanic details updated successfully',
+        data: {
+            id: mechanic.id,
+            phone: mechanic.phone,
+            address: mechanic.address,
+            emergency_contact: mechanic.emergency_contact
+        }
+    });
+});
 
 // Create a new mechanic
-exports.createMechanic = async (req, res) => {
-    const { name, is_active } = req.body;
+exports.createMechanic = asyncHandler(async (req, res) => {
     try {
+        const { name, is_active } = req.body;
         // Handle photo upload if provided
         let photoUrl = null;
         if (req.file) {
@@ -276,24 +236,19 @@ exports.createMechanic = async (req, res) => {
             }
         });
     } catch (error) {
-        // Delete uploaded file on error
+        // Clean up the orphaned upload before delegating to the global handler.
         if (req.file && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }
-        console.error('Create mechanic error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error creating mechanic',
-            error: error.message
-        });
+        throw error;
     }
-};
+});
 
 // Update a mechanic
-exports.updateMechanic = async (req, res) => {
-    const { id } = req.params;
-    const { name, is_active } = req.body;
+exports.updateMechanic = asyncHandler(async (req, res) => {
     try {
+        const { id } = req.params;
+        const { name, is_active } = req.body;
         // Handle photo upload if provided
         let finalPhotoUrl = undefined;
         if (req.file) {
@@ -374,37 +329,28 @@ exports.updateMechanic = async (req, res) => {
             }
         });
     } catch (error) {
-        // Delete uploaded file on error
+        // Clean up the orphaned upload before delegating to the global handler.
         if (req.file && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }
-        console.error('Update mechanic error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error updating mechanic',
-            error: error.message
-        });
+        throw error;
     }
-};
+});
 
 // Delete a mechanic
-exports.deleteMechanic = async (req, res) => {
+exports.deleteMechanic = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    try {
-        const mechanic = await Mechanic.findByPk(id);
-        if (!mechanic) {
-            return res.status(404).json({ message: 'Mechanic not found' });
-        }
-        
-        const oldValues = { name: mechanic.name, is_active: mechanic.is_active };
-        
-        await mechanic.destroy();
-        
-        // Audit log
-        await auditService.logDelete(req.user?.id, 'mechanics', id, oldValues, req);
-        
-        res.status(204).send();
-    } catch (error) {
-        res.status(500).json({ message: 'Error deleting mechanic', error });
+    const mechanic = await Mechanic.findByPk(id);
+    if (!mechanic) {
+        return res.status(404).json({ message: 'Mechanic not found' });
     }
-};
+
+    const oldValues = { name: mechanic.name, is_active: mechanic.is_active };
+
+    await mechanic.destroy();
+
+    // Audit log
+    await auditService.logDelete(req.user?.id, 'mechanics', id, oldValues, req);
+
+    res.status(204).send();
+});

@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Garatech MMS design tokens */
+:root {
+  --navy-50: #eef1f8;
+  --navy-100: #d8dff0;
+  --navy-200: #b4c0e0;
+  --navy-500: #4b5e8a;
+  --navy-700: #253870;
+  --navy-800: #1b2d5e;
+  --navy-900: #12204a;
+  --navy-950: #0d1535;
+  --orange-50: #fff5eb;
+  --orange-100: #ffe8cc;
+  --orange-500: #f0893a;
+  --orange-600: #d97028;
+  --orange-700: #c0601e;
+  --plate-bg: #1a1a1a;
+  --plate-text: #e8d84a;
+  --plate-border: #3a3620;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-display: swap;
+}
+
+.font-mono-plate {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.04em;
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  /* iOS home-indicator safe area for the fixed bottom nav. Requires
+     viewportFit: 'cover' in the root viewport config to resolve non-zero. */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Floating bar offset: clears the mobile bottom-nav (68px) + safe area.
+     On md+ there is no bottom-nav, so it sits near the bottom edge instead. */
+  .bottom-nav-offset {
+    bottom: calc(68px + env(safe-area-inset-bottom) + 0.5rem);
+  }
+  @media (min-width: 768px) {
+    .bottom-nav-offset {
+      bottom: 1rem;
+    }
+  }
+}

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const servicesController = require('../controllers/services.controller');
 const { verifyToken, requireRole } = require('../middleware/auth.middleware');
-const { validateService } = require('../middleware/validation.middleware');
+const { validateService, handleValidationErrors } = require('../middleware/validation.middleware');
 const multer = require('multer');
 const path = require('path');
 
@@ -48,7 +48,7 @@ router.post('/:id/upload-image', verifyToken, requireRole('ADMIN'), upload.singl
 router.get('/:id', servicesController.getServiceById);
 
 // Protected routes (Admin only)
-router.post('/', verifyToken, requireRole('ADMIN'), optionalUpload, validateService, servicesController.createService);
+router.post('/', verifyToken, requireRole('ADMIN'), optionalUpload, validateService, handleValidationErrors, servicesController.createService);
 router.put('/:id', verifyToken, requireRole('ADMIN'), optionalUpload, servicesController.updateService);
 router.delete('/:id', verifyToken, requireRole('ADMIN'), servicesController.deleteService);
 

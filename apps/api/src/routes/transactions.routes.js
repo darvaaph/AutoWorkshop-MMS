@@ -43,6 +43,13 @@ router.get('/:id/print', transactionsController.getTransactionForPrint);
 router.post('/:id/pay', validatePayment, transactionsController.addPayment);
 
 /**
+ * @route   PUT /api/transactions/:id
+ * @desc    Edit items of an open transaction (bon sementara: PENDING/UNPAID/PARTIAL)
+ * @access  Private (ADMIN, CASHIER)
+ */
+router.put('/:id', transactionsController.updateTransaction);
+
+/**
  * @route   PUT /api/transactions/:id/cancel
  * @desc    Cancel transaction and restore stock
  * @access  Private (ADMIN only)

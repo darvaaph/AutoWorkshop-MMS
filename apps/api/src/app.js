@@ -9,7 +9,9 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-app.use(morgan('dev')); // HTTP request logger
+if (process.env.NODE_ENV !== 'test') {
+    app.use(morgan('dev')); // HTTP request logger (silent during tests)
+}
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -37,14 +39,9 @@ app.use((req, res) => {
     });
 });
 
-// Global Error Handler
-app.use((err, req, res, next) => {
-    console.error('❌ Error:', err);
-    res.status(err.status || 500).json({ 
-        success: false, 
-        message: err.message || 'Internal Server Error' 
-    });
-});
+// Global Error Handler (consistent JSON shape + Sequelize error mapping)
+const errorHandler = require('./middleware/error.middleware');
+app.use(errorHandler);
 
 // Start the server with database connection
 const startServer = async () => {
@@ -63,6 +60,10 @@ const startServer = async () => {
     }
 };
 
-startServer();
+// Don't bind a port (or hard-exit on DB failure) when imported by the test runner;
+// supertest drives the exported `app` directly.
+if (process.env.NODE_ENV !== 'test') {
+    startServer();
+}
 
 module.exports = app;

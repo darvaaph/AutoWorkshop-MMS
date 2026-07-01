@@ -2,14 +2,14 @@ const express = require('express');
 const router = express.Router();
 const inventoryController = require('../controllers/inventory.controller');
 const { verifyToken, requireRole } = require('../middleware/auth.middleware');
-const { validateInventory, handleValidationErrors } = require('../middleware/validation.middleware');
+const { validateInventory, validateStockIn, handleValidationErrors } = require('../middleware/validation.middleware');
 
 // All routes require authentication
 router.use(verifyToken);
 
 // ============ STOCK IN (BARANG MASUK) ============
 // Stock In dengan HPP Moving Average
-router.post('/in', validateInventory, handleValidationErrors, inventoryController.addInventoryIn);
+router.post('/in', validateStockIn, handleValidationErrors, inventoryController.addInventoryIn);
 
 // ============ STOCK AUDIT / STOCK OPNAME ============
 // Stock Audit - Penyesuaian stok sesuai inventaris aktual
